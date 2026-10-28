@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -92,14 +93,16 @@ class Product extends Model
      */
     public function getRouteKey(): string
     {
-        return 'id-' . $this->getKey();
+        $slug = Str::slug((string) $this->name);
+
+        return ($slug !== '' ? $slug : 'produkt') . '--id-' . $this->getKey();
     }
 
     public function resolveRouteBinding($value, $field = null)
     {
         $value = (string) $value;
 
-        if (preg_match('/^id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
+        if (preg_match('/^.+--id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
             return $this->whereKey($matches[1])->firstOrFail();
         }
 
