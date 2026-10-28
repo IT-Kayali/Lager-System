@@ -10,7 +10,7 @@
 <section class="dashboard-main-grid">
 <div class="dashboard-panel"><div class="dashboard-panel-header"><div><h2>Verkaufsstatistik</h2><p>Auswertung erledigter Verkäufe nach verkaufter Menge.</p></div></div><div class="dashboard-ranking-grid">
 @foreach ([['Top 10 meistverkauft',$topSellingProducts],['Top 10 am wenigsten verkauft',$leastSellingProducts]] as $ranking)
-<div class="dashboard-ranking-block"><h3>{{ $ranking[0] }}</h3><div class="dashboard-ranking-list">@forelse($ranking[1] as $index=>$product)<a href="{{ route('products.show',$product->id) }}" class="dashboard-ranking-row"><span class="dashboard-rank">{{ $index+1 }}</span><span class="dashboard-product-name">{{ $product->name }}</span><strong>{{ number_format((float)$product->sold_quantity,2,',','.') }}</strong></a>@empty<div class="dashboard-empty">Noch keine Produkte vorhanden.</div>@endforelse</div></div>
+<div class="dashboard-ranking-block"><h3>{{ $ranking[0] }}</h3><div class="dashboard-ranking-list">@forelse($ranking[1] as $index=>$product)<a href="{{ route('products.show',$product) }}" class="dashboard-ranking-row"><span class="dashboard-rank">{{ $index+1 }}</span><span class="dashboard-product-name">{{ $product->name }}</span><strong>{{ number_format((float)$product->sold_quantity,2,',','.') }}</strong></a>@empty<div class="dashboard-empty">Noch keine Produkte vorhanden.</div>@endforelse</div></div>
 @endforeach
 </div></div>
 <div class="dashboard-side-column">
