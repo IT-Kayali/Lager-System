@@ -41,9 +41,23 @@ class ProductCategory extends Model
         return preg_replace('/\s+/', '-', trim((string) $this->name));
     }
 
+    /**
+     * Use a stable URL identifier; names with spaces and hyphens can collide.
+     */
+    public function getRouteKey(): string
+    {
+        return 'id-' . $this->getKey();
+    }
+
     public function resolveRouteBinding($value, $field = null)
     {
-        $nameFromUrl = str_replace('-', ' ', (string) $value);
+        $value = (string) $value;
+
+        if (preg_match('/^id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
+            return $this->whereKey($matches[1])->firstOrFail();
+        }
+
+        $nameFromUrl = str_replace('-', ' ', $value);
 
         return $this->where('name', $value)->first()
             ?? $this->where('name', $nameFromUrl)->first()
