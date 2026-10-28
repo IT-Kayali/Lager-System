@@ -151,7 +151,7 @@
 
                         <tr>
                             <td>
-                                <a class="product-link" href="{{ route('products.show', ['product' => $product->name]) }}">
+                                <a class="product-link" href="{{ route('products.show', ['product' => $product]) }}">
                                     {{ $product->name }}
                                 </a>
                             </td>
@@ -171,7 +171,7 @@
                             </td>
 
                             <td>
-                                <a class="premium-icon-btn" href="{{ route('products.show', ['product' => $product->name]) }}" title="Produkt öffnen">
+                                <a class="premium-icon-btn" href="{{ route('products.show', ['product' => $product]) }}" title="Produkt öffnen">
                                     <i class="bi bi-eye"></i>
                                 </a>
                             </td>

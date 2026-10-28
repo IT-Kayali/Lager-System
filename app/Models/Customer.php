@@ -53,6 +53,62 @@ class Customer extends Model
         });
     }
 
+    public function getRouteKey(): string
+    {
+        return \Illuminate\Support\Str::slug(
+            (string) $this->company_name
+        );
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field !== null) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        $routeValue = (string) $value;
+
+        $matching = $this->newQuery()
+            ->get(['id', 'company_name'])
+            ->first(
+                fn (self $record) =>
+                    \Illuminate\Support\Str::slug(
+                        (string) $record->company_name
+                    ) === $routeValue
+            );
+
+        if ($matching !== null) {
+            return $this->newQuery()
+                ->findOrFail($matching->getKey());
+        }
+
+        $matching = $this->newQuery()
+            ->where('company_name', $routeValue)
+            ->first();
+
+        if ($matching !== null) {
+            return $matching;
+        }
+
+        $matching = $this->newQuery()
+            ->where('customer_number', $routeValue)
+            ->first();
+
+        if ($matching !== null) {
+            return $matching;
+        }
+
+        if (ctype_digit($routeValue)) {
+            return $this->newQuery()
+                ->whereKey($routeValue)
+                ->firstOrFail();
+        }
+
+        return $this->newQuery()
+            ->where('company_name', $routeValue)
+            ->firstOrFail();
+    }
+
     public function group(): BelongsTo
     {
         return $this->belongsTo(CustomerGroup::class, 'customer_group_id');

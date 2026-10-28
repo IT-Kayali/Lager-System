@@ -41,13 +41,68 @@ class ProductCategory extends Model
         return preg_replace('/\s+/', '-', trim((string) $this->name));
     }
 
+    public function getRouteKey(): string
+    {
+        return \Illuminate\Support\Str::slug(
+            (string) $this->name
+        );
+    }
+
     public function resolveRouteBinding($value, $field = null)
     {
-        $nameFromUrl = str_replace('-', ' ', (string) $value);
+        if ($field !== null) {
+            return parent::resolveRouteBinding($value, $field);
+        }
 
-        return $this->where('name', $value)->first()
-            ?? $this->where('name', $nameFromUrl)->first()
-            ?? $this->whereKey($value)->firstOrFail();
+        $routeValue = (string) $value;
+
+        // Eindeutige URL aus dem Namen ermitteln.
+        $matching = $this->newQuery()
+            ->get(['id', 'name'])
+            ->first(
+                fn (self $record) =>
+                    \Illuminate\Support\Str::slug(
+                        (string) $record->name
+                    ) === $routeValue
+            );
+
+        if ($matching !== null) {
+            return $this->newQuery()
+                ->findOrFail($matching->getKey());
+        }
+
+        // Ältere direkte Namenslinks.
+        $matched = $this->newQuery()
+            ->where('name', $routeValue)
+            ->first();
+
+        if ($matched !== null) {
+            return $matched;
+        }
+
+        // Alte lesbare Kategorie-Links unterstützen.
+        $legacy = str_replace('-', ' ', $routeValue);
+
+        if ($legacy !== $routeValue) {
+            $matched = $this->newQuery()
+                ->where('name', $legacy)
+                ->first();
+
+            if ($matched !== null) {
+                return $matched;
+            }
+        }
+
+        // Alte numerische URLs ohne Namenskollision.
+        if (ctype_digit($routeValue)) {
+            return $this->newQuery()
+                ->whereKey($routeValue)
+                ->firstOrFail();
+        }
+
+        return $this->newQuery()
+            ->where('name', $routeValue)
+            ->firstOrFail();
     }
 
     public function products(): BelongsToMany

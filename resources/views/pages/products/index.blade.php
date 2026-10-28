@@ -114,13 +114,13 @@
                                     </a>
 
                                     @if ($canCreateBranchWithdrawal)
-                                        <a class="premium-icon-btn" href="{{ route($branchCreateRoute, ['product_id' => $product->id]) }}" title="Filialausgang erstellen">
+                                        <a class="premium-icon-btn" href="{{ route($branchCreateRoute, ['produkt' => $product->name]) }}" title="Filialausgang erstellen">
                                             <i class="bi bi-shop"></i>
                                         </a>
                                     @endif
 
                                     @unless($isSales)
-                                        <a class="premium-icon-btn" href="{{ route('batches.create', ['product_id' => $product->id]) }}" title="Bestand buchen">
+                                        <a class="premium-icon-btn" href="{{ route('batches.create', ['produkt' => $product->name]) }}" title="Bestand buchen">
                                             <i class="bi bi-layers"></i>
                                         </a>
 

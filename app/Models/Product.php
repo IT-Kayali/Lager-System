@@ -86,10 +86,44 @@ class Product extends Model
             ->orderBy($idColumn, $direction);
     }
 
+    /**
+     * Der sichtbare Produktname ist der URL-Parameter.
+     * Beispiel: /products/1 statt /products/666.
+     */
+    public function getRouteKey(): string
+    {
+        return (string) $this->name;
+    }
+
+    /**
+     * Namen haben Vorrang vor numerischen Datenbank-IDs.
+     * Alte ID-Links bleiben ohne Namenskollision erreichbar.
+     */
     public function resolveRouteBinding($value, $field = null)
     {
-        return $this->where('name', $value)->first()
-            ?? $this->whereKey($value)->firstOrFail();
+        if ($field !== null) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        $routeValue = (string) $value;
+
+        $product = $this->newQuery()
+            ->where('name', $routeValue)
+            ->first();
+
+        if ($product !== null) {
+            return $product;
+        }
+
+        if (ctype_digit($routeValue)) {
+            return $this->newQuery()
+                ->whereKey($routeValue)
+                ->firstOrFail();
+        }
+
+        return $this->newQuery()
+            ->where('name', $routeValue)
+            ->firstOrFail();
     }
 
     public function categories(): BelongsToMany

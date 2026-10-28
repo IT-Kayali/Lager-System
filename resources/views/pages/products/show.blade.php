@@ -29,14 +29,14 @@
 
     <section class="product-preview-actions">
         @unless($isSales)
-            <a class="premium-btn gold" href="{{ route('batches.create', ['product_id' => $product->id]) }}">
+            <a class="premium-btn gold" href="{{ route('batches.create', ['produkt' => $product->name]) }}">
                 <i class="bi bi-grid"></i>
                 Bestand buchen
             </a>
         @endunless
 
         @if ($canCreateBranchWithdrawal)
-            <a class="premium-btn" href="{{ route($branchCreateRoute, ['product_id' => $product->id]) }}">
+            <a class="premium-btn" href="{{ route($branchCreateRoute, ['produkt' => $product->name]) }}">
                 <i class="bi bi-shop"></i>
                 Filialausgang
             </a>
@@ -106,7 +106,7 @@
             </div>
 
             @unless($isSales)
-                <a class="premium-btn gold" href="{{ route('batches.create', ['product_id' => $product->id]) }}">
+                <a class="premium-btn gold" href="{{ route('batches.create', ['produkt' => $product->name]) }}">
                     <i class="bi bi-plus-lg"></i>
                     Charge hinzufügen
                 </a>

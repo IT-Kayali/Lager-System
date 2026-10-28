@@ -135,9 +135,20 @@ class BranchWithdrawalController extends Controller
     {
         $this->authorizeCreateAction();
 
-        $selectedProduct = $request->filled('product_id')
-            ? Product::query()->find($request->integer('product_id'))
-            : null;
+        $productName = $request->query('produkt');
+
+        if ($productName !== null) {
+            abort_unless(is_string($productName) && $productName !== '', 404);
+
+            $selectedProduct = Product::query()
+                ->where('name', $productName)
+                ->firstOrFail();
+        } else {
+            // Alte Links mit product_id bleiben funktionsfähig.
+            $selectedProduct = $request->filled('product_id')
+                ? Product::query()->find($request->integer('product_id'))
+                : null;
+        }
 
         $withdrawal = new BranchWithdrawal([
             'branch_name' => null,

@@ -64,14 +64,76 @@ class Supplier extends Model
         return preg_replace('/\s+/', '-', trim((string) $name));
     }
 
+    public function getRouteKey(): string
+    {
+        return \Illuminate\Support\Str::slug(
+            (string) $this->company_name
+        );
+    }
+
     public function resolveRouteBinding($value, $field = null)
     {
-        $nameFromUrl = str_replace('-', ' ', (string) $value);
+        if ($field !== null) {
+            return parent::resolveRouteBinding($value, $field);
+        }
 
-        return $this->where('company_name', $value)->first()
-            ?? $this->where('company_name', $nameFromUrl)->first()
-            ?? $this->where('supplier_number', $value)->first()
-            ?? $this->whereKey($value)->firstOrFail();
+        $routeValue = (string) $value;
+
+        // Eindeutige URL aus dem Namen ermitteln.
+        $matching = $this->newQuery()
+            ->get(['id', 'company_name'])
+            ->first(
+                fn (self $record) =>
+                    \Illuminate\Support\Str::slug(
+                        (string) $record->company_name
+                    ) === $routeValue
+            );
+
+        if ($matching !== null) {
+            return $this->newQuery()
+                ->findOrFail($matching->getKey());
+        }
+
+        // Ältere direkte Namenslinks.
+        $matched = $this->newQuery()
+            ->where('company_name', $routeValue)
+            ->first();
+
+        if ($matched !== null) {
+            return $matched;
+        }
+
+        // Alte Lieferanten-Links unterstützen.
+        $legacy = str_replace('-', ' ', $routeValue);
+
+        if ($legacy !== $routeValue) {
+            $matched = $this->newQuery()
+                ->where('company_name', $legacy)
+                ->first();
+
+            if ($matched !== null) {
+                return $matched;
+            }
+        }
+
+        $matched = $this->newQuery()
+            ->where('supplier_number', $routeValue)
+            ->first();
+
+        if ($matched !== null) {
+            return $matched;
+        }
+
+        // Alte numerische URLs ohne Namenskollision.
+        if (ctype_digit($routeValue)) {
+            return $this->newQuery()
+                ->whereKey($routeValue)
+                ->firstOrFail();
+        }
+
+        return $this->newQuery()
+            ->where('company_name', $routeValue)
+            ->firstOrFail();
     }
 
 

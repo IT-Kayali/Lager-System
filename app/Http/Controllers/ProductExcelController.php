@@ -193,6 +193,18 @@ class ProductExcelController extends Controller
                     ->where('product_code', $productCode)
                     ->first();
 
+                $duplicateNameQuery = Product::query()
+                    ->where('name', $name);
+
+                if ($product !== null) {
+                    $duplicateNameQuery->where('id', '!=', $product->id);
+                }
+
+                if ($duplicateNameQuery->exists()) {
+                    $errors[] = "Produkte Zeile {$line}: Der Produktname {$name} wird bereits von einem anderen Produkt verwendet.";
+                    continue;
+                }
+
                 if ($product) {
                     $product->update($productData);
                     $updatedProducts++;
