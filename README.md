@@ -15,6 +15,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Produktverwaltung mit Produktbezeichnung, Code-Nummer, Fake Name, Einheit und Lieferant
 - Kategorien mit Prioritäten
 - Kategorien können Preisstaffeln aktivieren/deaktivieren
+- Kategorien verwenden ebenfalls eindeutige Links mit Kategoriename und Datensatz-ID, damit Vorschau, Bearbeiten und Formularaktionen denselben Datensatz verwenden
 - Mindestbestand und Warnschwellen
 - Verfügbarer Bestand unter Berücksichtigung aktiver Reservierungen
 - Sichere Produktlöschung: verwendete Produkte werden nicht aus historischen Vorgängen entfernt
@@ -22,6 +23,8 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Erweiterte Suche mit auswählbarem Suchfeld und „Exakter Wert“
 - Sortierung unter anderem nach Produktbezeichnung, Fake Name, Code und Lieferant
 - Natürliche Produktsortierung für numerische Namen, z. B. `2, 3, 10`
+- Eindeutige Vorschau-, Bearbeitungs- und Aktionslinks mit lesbarer Bezeichnung und unveränderlicher Datensatz-ID, z. B. `/products/1--id-666` für Produktname `1` und ID `666` (Korrektur PR #135)
+- Dieselbe stabile Zuordnung gilt für Produkte aus Dashboard, Lieferanten- und Kategorieansichten sowie für Verkaufsvorschauen; bestehende Namens-/ID-Links bleiben grundsätzlich erreichbar
 
 ### Chargen & FIFO
 
@@ -172,6 +175,7 @@ Dieser Hinweis wird automatisch auf Lieferscheinen des ausgewählten Kunden ange
 - Suche mit „Exakter Wert“
 - Zugriff für **Manager** und **Lager**
 - kein Lieferantenzugriff für **Verkauf**
+- Einheitliche Vorschau- und Bearbeitungslinks mit lesbarem Firmennamen und stabiler ID; damit führen ähnlich geschriebene Firmen (Leerzeichen/Bindestriche) nicht zum falschen Datensatz
 
 ### PDF-Dokumente
 
