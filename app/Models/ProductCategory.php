@@ -46,14 +46,16 @@ class ProductCategory extends Model
      */
     public function getRouteKey(): string
     {
-        return 'id-' . $this->getKey();
+        $slug = Str::slug((string) $this->name);
+
+        return ($slug !== '' ? $slug : 'kategorie') . '--id-' . $this->getKey();
     }
 
     public function resolveRouteBinding($value, $field = null)
     {
         $value = (string) $value;
 
-        if (preg_match('/^id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
+        if (preg_match('/^.+--id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
             return $this->whereKey($matches[1])->firstOrFail();
         }
 
