@@ -174,3 +174,41 @@ it('rejects unknown canonical IDs rather than selecting another similarly named 
     $this->get(route('product-categories.show', ['product_category' => 'missing--id-999999999']))
         ->assertNotFound();
 });
+it('uses the same exact numeric-named product from supplier and category previews', function () {
+    $supplier = Supplier::create([
+        'supplier_number' => 'LFR-LINK-100',
+        'company_name' => 'Verknüpfter Lieferant',
+    ]);
+
+    $category = ProductCategory::create([
+        'name' => 'Verknüpfte Kategorie',
+        'slug' => 'verknuepfte-kategorie',
+        'priority' => 30,
+        'is_active' => true,
+    ]);
+
+    $product = Product::create([
+        'name' => '1',
+        'unit' => 'gram',
+        'minimum_stock' => 0,
+        'supplier_id' => $supplier->id,
+    ]);
+
+    $product->categories()->attach($category->id);
+    $productUrl = route('products.show', $product);
+
+    expect($productUrl)->toEndWith('/products/1--id-'.$product->id);
+
+    $this->actingAs($this->manager)
+        ->get(route('suppliers.show', $supplier))
+        ->assertOk()
+        ->assertSee('href="'.$productUrl.'"', false);
+
+    $this->get(route('product-categories.show', $category))
+        ->assertOk()
+        ->assertSee('href="'.$productUrl.'"', false);
+
+    $this->get($productUrl)
+        ->assertOk()
+        ->assertSee('<h1>1</h1>', false);
+});
