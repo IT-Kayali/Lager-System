@@ -29,10 +29,12 @@ it('opens the exact product for preview and editing even when another product na
     $edit = route('products.edit', $product);
     $delete = route('products.destroy', $product);
 
-    expect($preview)->toEndWith('/products/id-'.$product->id)
-        ->and($edit)->toEndWith('/products/id-'.$product->id.'/edit')
-        ->and($delete)->toEndWith('/products/id-'.$product->id)
-        ->and($preview)->not->toBe(route('products.show', $nameCollision));
+    expect($preview)->toEndWith('/products/originalprodukt--id-'.$product->id)
+        ->and($edit)->toEndWith('/products/originalprodukt--id-'.$product->id.'/edit')
+        ->and($delete)->toEndWith('/products/originalprodukt--id-'.$product->id)
+        ->and($preview)->not->toBe(route('products.show', $nameCollision))
+        ->and(route('products.show', $nameCollision))
+        ->toEndWith('/products/'.$nameCollision->name.'--id-'.$nameCollision->id);
 
     $this->actingAs($this->manager)
         ->get($preview)
@@ -89,8 +91,8 @@ it('uses exact supplier IDs across list preview edit and legacy links', function
     $preview = route('suppliers.show', $supplier);
     $edit = route('suppliers.edit', $supplier);
 
-    expect($preview)->toEndWith('/suppliers/id-'.$supplier->id)
-        ->and($edit)->toEndWith('/suppliers/id-'.$supplier->id.'/edit');
+    expect($preview)->toEndWith('/suppliers/meyer-test--id-'.$supplier->id)
+        ->and($edit)->toEndWith('/suppliers/meyer-test--id-'.$supplier->id.'/edit');
 
     $this->actingAs($this->manager)
         ->get($preview)
@@ -133,9 +135,9 @@ it('keeps categories distinct when the names normalize to the same hyphenated UR
     $preview = route('product-categories.show', $category);
     $edit = route('product-categories.edit', $category);
 
-    expect($preview)->toEndWith('/product-categories/id-'.$category->id)
+    expect($preview)->toEndWith('/product-categories/duft-sets--id-'.$category->id)
         ->and($preview)->not->toBe(route('product-categories.show', $other))
-        ->and($edit)->toEndWith('/product-categories/id-'.$category->id.'/edit');
+        ->and($edit)->toEndWith('/product-categories/duft-sets--id-'.$category->id.'/edit');
 
     $this->actingAs($this->manager)
         ->get($preview)
@@ -163,12 +165,12 @@ it('keeps categories distinct when the names normalize to the same hyphenated UR
 
 it('rejects unknown canonical IDs rather than selecting another similarly named record', function () {
     $this->actingAs($this->manager)
-        ->get(route('products.show', ['product' => 'id-999999999']))
+        ->get(route('products.show', ['product' => 'missing--id-999999999']))
         ->assertNotFound();
 
-    $this->get(route('suppliers.edit', ['supplier' => 'id-999999999']))
+    $this->get(route('suppliers.edit', ['supplier' => 'missing--id-999999999']))
         ->assertNotFound();
 
-    $this->get(route('product-categories.show', ['product_category' => 'id-999999999']))
+    $this->get(route('product-categories.show', ['product_category' => 'missing--id-999999999']))
         ->assertNotFound();
 });
