@@ -2,11 +2,9 @@
 
 namespace App\Models;
 
-use App\Models\Product;
-
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Supplier extends Model
 {
