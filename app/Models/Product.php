@@ -86,8 +86,23 @@ class Product extends Model
             ->orderBy($idColumn, $direction);
     }
 
+    /**
+     * Use a reserved, unambiguous URL key for newly generated record links.
+     * Legacy links using a product name or a numeric ID remain supported.
+     */
+    public function getRouteKey(): string
+    {
+        return 'id-' . $this->getKey();
+    }
+
     public function resolveRouteBinding($value, $field = null)
     {
+        $value = (string) $value;
+
+        if (preg_match('/^id-([1-9][0-9]*)$/D', $value, $matches) === 1) {
+            return $this->whereKey($matches[1])->firstOrFail();
+        }
+
         return $this->where('name', $value)->first()
             ?? $this->whereKey($value)->firstOrFail();
     }
