@@ -1003,3 +1003,41 @@ main
 ```
 
 Dadurch bleibt `main` möglichst stabil, getestete Änderungen können kontrolliert übernommen werden und die Projektdokumentation bleibt synchron mit dem tatsächlichen Produktionsstand.
+
+## Namensbasierte URLs – Oktober 2026
+
+Die Links für Produkte, Kategorien, Kunden und Lieferanten
+wurden vereinheitlicht.
+
+### Umsetzung
+
+- Produkte nutzen den tatsächlichen Produktnamen in der URL,
+  beispielsweise `/products/1` und `/products/3A`.
+- Kategorien verwenden lesbare Slugs aus dem Kategorienamen.
+- Lieferanten verwenden Slugs aus dem Firmennamen.
+- Kunden verwenden Slugs aus dem Firmennamen.
+- Sonderzeichen, Leerzeichen und Schrägstriche werden
+  für die URL umgewandelt.
+- Gespeicherte Namen bleiben unverändert.
+- Vorschau, Bearbeitung und Aktualisierung verwenden
+  die jeweilige Model-Routenauflösung.
+- Filialausgang und Bestand buchen nutzen für die
+  Vorbelegung `?produkt=PRODUKTNAME`.
+- Die Formulare und Lagerbuchungen verwenden weiterhin
+  die ursprünglichen numerischen Datenbank-IDs.
+- Eindeutig auflösbare ältere Links bleiben unterstützt.
+- Namenskonflikte werden in den Verwaltungsbereichen
+  und beim Produkt-Excel-Import geprüft.
+
+### Validierung und Betrieb
+
+- PHP-Syntax und Laravel-Ansichten geprüft.
+- Funktionsprüfung der neuen Links auf dem Live-Server
+  vom Betreiber bestätigt.
+- Die automatisierten Laravel-Tests konnten auf dem
+  Produktivserver nicht ausgeführt werden, weil dort
+  der Artisan-Befehl `test` nicht verfügbar ist.
+- Automatisierte Tests müssen vor dem Merge in einer
+  Entwicklungs- oder CI-Umgebung ausgeführt werden.
+- Keine bestehenden Datenbank-IDs, Lagerbestände,
+  Chargen oder Zuordnungen umnummeriert.

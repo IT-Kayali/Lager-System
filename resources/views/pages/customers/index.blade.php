@@ -79,7 +79,11 @@
                         <tr>
                             <td><span class="premium-code">{{ $customer->customer_number }}</span></td>
                             <td>
-                                <strong>{{ $customer->company_name }}</strong>
+                                @unless ($crmCustomerCare)
+                                    <a class="customer-name-link" href="{{ route('customers.show', $customer) }}"><strong>{{ $customer->company_name }}</strong></a>
+                                @else
+                                    <strong>{{ $customer->company_name }}</strong>
+                                @endunless
                                 @if ($customer->notes)
                                     <div class="premium-muted">{{ \Illuminate\Support\Str::limit($customer->notes, 60) }}</div>
                                 @endif

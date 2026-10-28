@@ -70,15 +70,12 @@
                 <tbody>
                     @forelse ($categories as $category)
                         @php
-                            $categoryUrlName = method_exists($category, 'getRouteName')
-                                ? $category->getRouteName()
-                                : $category->name;
                             $productCount = $category->products_count ?? $category->products()->count();
                         @endphp
 
                         <tr>
                             <td>
-                                <a class="category-name-link" href="{{ route('product-categories.show', ['product_category' => $categoryUrlName]) }}">
+                                <a class="category-name-link" href="{{ route('product-categories.show', $category) }}">
                                     <span class="category-color-dot" data-csp-color="{{ $category->color ?: '#d4af37' }}"></span>
                                     <span class="category-name-copy">
                                         <strong>{{ $category->name }}</strong>
@@ -98,7 +95,7 @@
                             </td>
                             <td>
                                 <div class="premium-actions category-actions">
-                                    <a class="premium-icon-btn" href="{{ route('product-categories.show', ['product_category' => $categoryUrlName]) }}" title="Vorschau"><i class="bi bi-eye"></i></a>
+                                    <a class="premium-icon-btn" href="{{ route('product-categories.show', $category) }}" title="Vorschau"><i class="bi bi-eye"></i></a>
                                     <a class="premium-icon-btn" href="{{ route('product-categories.edit', $category) }}" title="Bearbeiten"><i class="bi bi-pencil-square"></i></a>
                                     <form method="POST" action="{{ route('product-categories.destroy', $category) }}" data-confirm="Kategorie wirklich löschen?">
                                         @csrf

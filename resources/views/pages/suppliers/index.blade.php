@@ -59,13 +59,12 @@
                 <tbody>
                     @forelse ($suppliers as $supplier)
                         @php
-                            $supplierUrl = method_exists($supplier, 'getRouteName') ? $supplier->getRouteName() : $supplier;
                             $productCount = $supplier->products_count ?? (method_exists($supplier, 'products') ? $supplier->products()->count() : 0);
                         @endphp
                         <tr>
-                            <td><a class="premium-code supplier-number-link" href="{{ route('suppliers.show', ['supplier' => $supplierUrl]) }}" title="Vorschau">{{ $supplier->supplier_number }}</a></td>
+                            <td><a class="premium-code supplier-number-link" href="{{ route('suppliers.show', $supplier) }}" title="Vorschau">{{ $supplier->supplier_number }}</a></td>
                             <td>
-                                <a class="supplier-name-link" href="{{ route('suppliers.show', ['supplier' => $supplierUrl]) }}">{{ $supplier->company_name }}</a>
+                                <a class="supplier-name-link" href="{{ route('suppliers.show', $supplier) }}">{{ $supplier->company_name }}</a>
                                 <div class="premium-muted supplier-contact-person">{{ $supplier->contact_person ?: 'Kein Ansprechpartner' }}</div>
                             </td>
                             <td>
@@ -84,7 +83,7 @@
                             <td><span class="supplier-products-pill"><i class="bi bi-box-seam"></i> {{ $productCount }}</span></td>
                             <td>
                                 <div class="premium-actions suppliers-actions">
-                                    <a class="premium-icon-btn" href="{{ route('suppliers.show', ['supplier' => $supplierUrl]) }}" title="Vorschau"><i class="bi bi-eye"></i></a>
+                                    <a class="premium-icon-btn" href="{{ route('suppliers.show', $supplier) }}" title="Vorschau"><i class="bi bi-eye"></i></a>
                                     <a class="premium-icon-btn" href="{{ route('suppliers.edit', $supplier) }}" title="Bearbeiten"><i class="bi bi-pencil"></i></a>
                                     <form method="POST" action="{{ route('suppliers.destroy', $supplier) }}" data-confirm="Lieferant wirklich löschen?">
                                         @csrf

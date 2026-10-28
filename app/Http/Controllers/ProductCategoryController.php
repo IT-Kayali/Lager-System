@@ -105,7 +105,7 @@ class ProductCategoryController extends Controller
 
     public function update(Request $request, ProductCategory $productCategory): RedirectResponse
     {
-        $this->priorityService->update($productCategory, $this->validatedData($request));
+        $this->priorityService->update($productCategory, $this->validatedData($request, $productCategory));
 
         return redirect()
             ->route('product-categories.index')
@@ -127,10 +127,39 @@ class ProductCategoryController extends Controller
             ->with('success', 'Kategorie wurde gelöscht.');
     }
 
-    private function validatedData(Request $request): array
+    private function validatedData(Request $request, ?ProductCategory $categoryForUrl = null): array
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($categoryForUrl): void {
+                    $slug = \Illuminate\Support\Str::slug((string) $value);
+
+                    if ($slug === '' || $slug === 'create') {
+                        $fail('Dieser Name kann nicht als eindeutiger Link verwendet werden.');
+                        return;
+                    }
+
+                    $collision = ProductCategory::query()
+                        ->when(
+                            $categoryForUrl !== null,
+                            fn ($query) => $query->where('id', '!=', $categoryForUrl?->id)
+                        )
+                        ->pluck('name')
+                        ->contains(
+                            fn ($existing) =>
+                                \Illuminate\Support\Str::slug(
+                                    (string) $existing
+                                ) === $slug
+                        );
+
+                    if ($collision) {
+                        $fail('Dieser Name erzeugt denselben Link wie ein vorhandener Eintrag.');
+                    }
+                },
+            ],
             'priority' => ['required', 'integer', 'min:1', 'max:999999'],
             'slug' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:3000'],

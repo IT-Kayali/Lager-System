@@ -84,7 +84,19 @@ class BatchController extends Controller
 
     public function create(Request $request): View
     {
-        $selectedProduct = Product::query()->find($request->integer('product_id'));
+        $productName = $request->query('produkt');
+
+        if ($productName !== null) {
+            abort_unless(is_string($productName) && $productName !== '', 404);
+
+            $selectedProduct = Product::query()
+                ->where('name', $productName)
+                ->firstOrFail();
+        } else {
+            // Alte Links mit product_id bleiben funktionsfähig.
+            $selectedProduct = Product::query()
+                ->find($request->integer('product_id'));
+        }
         $receivedAt = now()->startOfDay();
         $defaultExpiryMonths = ApplicationSetting::defaultBatchExpiryMonths();
 

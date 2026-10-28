@@ -195,7 +195,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
-        $customer->update($this->validatedData($request));
+        $customer->update($this->validatedData($request, $customer));
 
         return redirect()
             ->route('customers.index')
@@ -223,11 +223,40 @@ class CustomerController extends Controller
             ->with('success', 'Kunde wurde gelöscht.');
     }
 
-    private function validatedData(Request $request): array
+    private function validatedData(Request $request, ?Customer $customerForUrl = null): array
     {
         $data = $request->validate([
             'customer_group_id' => ['required', 'integer', 'exists:customer_groups,id'],
-            'company_name' => ['required', 'string', 'max:255'],
+            'company_name' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($customerForUrl): void {
+                    $slug = \Illuminate\Support\Str::slug((string) $value);
+
+                    if ($slug === '' || $slug === 'create') {
+                        $fail('Dieser Name kann nicht als eindeutiger Link verwendet werden.');
+                        return;
+                    }
+
+                    $collision = Customer::query()
+                        ->when(
+                            $customerForUrl !== null,
+                            fn ($query) => $query->where('id', '!=', $customerForUrl?->id)
+                        )
+                        ->pluck('company_name')
+                        ->contains(
+                            fn ($existing) =>
+                                \Illuminate\Support\Str::slug(
+                                    (string) $existing
+                                ) === $slug
+                        );
+
+                    if ($collision) {
+                        $fail('Dieser Name erzeugt denselben Link wie ein vorhandener Eintrag.');
+                    }
+                },
+            ],
             'email' => ['nullable', 'email', 'max:255'],
             'phone_country_code' => ['required', 'string', 'max:10'],
             'phone' => ['nullable', 'string', 'max:255'],

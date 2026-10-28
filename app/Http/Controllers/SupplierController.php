@@ -100,7 +100,7 @@ class SupplierController extends Controller
 
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
-        $supplier->update($this->validatedData($request));
+        $supplier->update($this->validatedData($request, $supplier));
 
         ActivityLog::record('supplier.updated', $supplier, [
             'supplier_number' => $supplier->supplier_number,
@@ -132,10 +132,39 @@ class SupplierController extends Controller
             ->with('success', 'Lieferant wurde gelöscht.');
     }
 
-    private function validatedData(Request $request): array
+    private function validatedData(Request $request, ?Supplier $supplierForUrl = null): array
     {
         return $request->validate([
-            'company_name' => ['required', 'string', 'max:255'],
+            'company_name' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($supplierForUrl): void {
+                    $slug = \Illuminate\Support\Str::slug((string) $value);
+
+                    if ($slug === '' || $slug === 'create') {
+                        $fail('Dieser Name kann nicht als eindeutiger Link verwendet werden.');
+                        return;
+                    }
+
+                    $collision = Supplier::query()
+                        ->when(
+                            $supplierForUrl !== null,
+                            fn ($query) => $query->where('id', '!=', $supplierForUrl?->id)
+                        )
+                        ->pluck('company_name')
+                        ->contains(
+                            fn ($existing) =>
+                                \Illuminate\Support\Str::slug(
+                                    (string) $existing
+                                ) === $slug
+                        );
+
+                    if ($collision) {
+                        $fail('Dieser Name erzeugt denselben Link wie ein vorhandener Eintrag.');
+                    }
+                },
+            ],
             'contact_person' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone_country_code' => ['required', 'string', 'max:10'],
