@@ -23,12 +23,22 @@
     $formatQty=fn($value):string=>\App\Support\GermanNumber::format($value);
     $unitLabels=['gram'=>'Gramm','liter'=>'Liter','piece'=>'Stück'];
     $items=$offer->items->values()->map(function($item)use($formatQty,$unitLabels){$unit=trim((string)($item->product?->unit??''));$quantity=$formatQty($item->quantity);$product=$item->product_name??$item->description??($item->product?->name??'');return(object)['product'=>$product,'unit'=>$unit!==''?($unitLabels[$unit]??$unit):'—','quantity'=>$quantity];});
-    $firstPageLimit=9;$normalPageLimit=18;$lastPageLimit=18;$pages=collect();$remaining=$items->values();$pages->push(['first'=>true,'items'=>$remaining->take($firstPageLimit)->values()]);$remaining=$remaining->slice($firstPageLimit)->values();while($remaining->count()>$lastPageLimit){$pages->push(['first'=>false,'items'=>$remaining->take($normalPageLimit)->values()]);$remaining=$remaining->slice($normalPageLimit)->values();}if($remaining->count()>0)$pages->push(['first'=>false,'items'=>$remaining->values()]);$pageCount=$pages->count();
+    $pages=\App\Support\DeliveryNoteLayout::paginate($items, (string)($offer->notes??''), trim((string)($customer?->delivery_note_instruction??''))!=='', true);$pageCount=$pages->count();
 @endphp
 @foreach($pages as $pageIndex=>$page)
 <div class="page">@if(!empty($backgroundDataUri))<img class="background" src="{{ $backgroundDataUri }}" alt="">@endif<div class="content">
 @if($page['first'])@if(!empty($logoDataUri))<img class="logo" src="{{ $logoDataUri }}" alt="">@endif<div class="sender-line">{{ $senderLine }}</div><div class="recipient">@foreach($recipientLines as $line){{ $line }}<br>@endforeach</div><div class="meta"><table><tr><td>Datum:</td><td>{{ now()->format('d.m.Y') }}</td></tr><tr><td>Kunden-Nr.:</td><td>{{ $customerNumber }}</td></tr><tr><td>Bestell-Nr.:</td><td>{{ $offer->offer_number }}</td></tr><tr><td>Versandart:</td><td>{{ $shippingMethod }}</td></tr></table></div><div class="title">Lieferschein</div><div class="intro">Sehr geehrte Damen und Herren,<br>vielen Dank für Ihre Bestellung. Wir liefern Ihnen wie vereinbart folgende Waren:</div>@endif
-<div class="items-wrap {{ $page['first']?'':'continuation' }}"><table class="items"><thead><tr><th>Produkt</th><th>Menge</th><th>Einheit</th></tr></thead><tbody>@foreach($page['items'] as $item)<tr><td>{{ $item->product }}</td><td>{{ $item->quantity }}</td><td>{{ $item->unit }}</td></tr>@endforeach</tbody></table></div>
+<div class="items-wrap {{ $page['first']?'':'continuation' }}">
+@if($page['items']->isNotEmpty())
+<table class="items"><thead><tr><th>Produkt</th><th>Menge</th><th>Einheit</th></tr></thead><tbody>@foreach($page['items'] as $item)<tr><td>{{ $item->product }}</td><td>{{ $item->quantity }}</td><td>{{ $item->unit }}</td></tr>@endforeach</tbody></table>
+@endif
+@if($page['note_lines'] !== [])
+<div class="offer-delivery-note-footer-note" style="margin-top:5mm;font-size:9.5pt;line-height:1.35;color:#111;overflow-wrap:break-word;word-wrap:break-word;">
+<strong>{{ $page['note_continued'] ? 'Hinweis (Fortsetzung):' : 'Hinweis:' }}</strong><br>
+@foreach($page['note_lines'] as $line)@if(!$loop->first)<br>@endif{{ $line === '' ? ' ' : $line }}@endforeach
+</div>
+@endif
+</div>
 @if($loop->last)<div class="ownership">Die gelieferte Ware bleibt bis zur vollständigen Bezahlung unser Eigentum.</div>@endif
 <div class="footer"><div class="footer-col footer-left"><strong>{{ $companyName }}</strong><br>@foreach($companyAddressLines as $line){{ $line }}<br>@endforeach</div><div class="footer-col footer-middle"><strong>Kontakt:</strong><br>@if($template->company_phone)Tel: {{ $template->company_phone }}<br>@endif @if($template->company_email)E-Mail: {{ $template->company_email }}<br>@endif @if($template->company_website)Web: {{ $template->company_website }}<br>@endif</div><div class="footer-col footer-right">@if($template->company_vat_id)USt-IdNr.: {{ $template->company_vat_id }}<br>@endif Vielen Dank für Ihr Vertrauen.</div></div><div class="page-number">Seite {{ $pageIndex+1 }} / {{ $pageCount }}</div></div></div>
 @endforeach
