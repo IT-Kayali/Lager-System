@@ -70,6 +70,7 @@ it('shows the same available stock with bounded queries in the offer editor', fu
         'stock_before' => 100,
         'stock_after' => 100,
         'batch_allocations' => [],
+        'note' => 'Performance-Testnotiz',
     ]);
     $withdrawal->items()->create([
         'product_id' => $product->id,
