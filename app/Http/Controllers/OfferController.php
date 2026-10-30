@@ -238,7 +238,65 @@ class OfferController extends Controller
         return auth()->user()?->isManager() ?? false;
     }
     private function customers(): Collection { return Customer::query()->with('group')->orderByRaw('LOWER(company_name) ASC')->get(); }
-    private function products(): Collection { return Product::query()->with(['categories', 'priceTiers', 'manualPriceRules'])->naturalNameOrder()->get(); }
+    /**
+     * Bestandsanzeige für die Angebotsformulare in Sammelabfragen berechnen.
+     * Die zentrale Lagerlogik für Reservierungen und Buchungen bleibt unverändert.
+     */
+    private function products(): Collection
+    {
+        $products = Product::query()
+            ->with(['categories', 'priceTiers', 'manualPriceRules'])
+            ->naturalNameOrder()
+            ->get();
+
+        if ($products->isEmpty()) {
+            return $products;
+        }
+
+        $totalStocks = DB::table('product_batches')
+            ->select('product_id')
+            ->selectRaw('SUM(quantity) AS total_quantity')
+            ->groupBy('product_id')
+            ->pluck('total_quantity', 'product_id');
+
+        $offerReservations = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('offers')
+            && \Illuminate\Support\Facades\Schema::hasTable('offer_items')) {
+            $offerReservations = DB::table('offer_items')
+                ->join('offers', 'offers.id', '=', 'offer_items.offer_id')
+                ->whereIn('offers.status', Offer::RESERVING_STATUSES)
+                ->select('offer_items.product_id')
+                ->selectRaw('SUM(offer_items.quantity) AS reserved_quantity')
+                ->groupBy('offer_items.product_id')
+                ->pluck('reserved_quantity', 'offer_items.product_id');
+        }
+
+        $branchReservations = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('branch_withdrawals')
+            && \Illuminate\Support\Facades\Schema::hasTable('branch_withdrawal_items')) {
+            $branchReservations = DB::table('branch_withdrawal_items')
+                ->join('branch_withdrawals', 'branch_withdrawals.id', '=', 'branch_withdrawal_items.branch_withdrawal_id')
+                ->whereIn('branch_withdrawals.status', BranchWithdrawal::RESERVING_STATUSES)
+                ->select('branch_withdrawal_items.product_id')
+                ->selectRaw('SUM(branch_withdrawal_items.quantity) AS reserved_quantity')
+                ->groupBy('branch_withdrawal_items.product_id')
+                ->pluck('reserved_quantity', 'branch_withdrawal_items.product_id');
+        }
+
+        foreach ($products as $product) {
+            $id = $product->getKey();
+            $total = (float) $totalStocks->get($id, 0);
+            $reserved = (float) $offerReservations->get($id, 0)
+                + (float) $branchReservations->get($id, 0);
+
+            $product->setAttribute(
+                'offer_editor_available_stock',
+                max(0.0, $total - $reserved)
+            );
+        }
+
+        return $products;
+    }
     private function templates(): array { return ['with_company' => 'Mit Firmendaten & Logo', 'without_company' => 'Ohne Firmendaten & Logo']; }
     private function statuses(): array { return Offer::STATUS_LABELS; }
     private function normalizeShippingData(array $data): array

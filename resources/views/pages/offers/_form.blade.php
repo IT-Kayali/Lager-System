@@ -91,7 +91,7 @@
                         @foreach ($products as $product)
                             <option value="{{ $product->id }}" @selected((string) ($item['product_id'] ?? '') === (string) $product->id)>
                                 {{ $product->name }}
-                                | {{ number_format($product->available_stock, 2, ',', '.') }} {{ $unitLabels[$product->unit] ?? $product->unit }} verfügbar
+                                | {{ number_format($product->offer_editor_available_stock, 2, ',', '.') }} {{ $unitLabels[$product->unit] ?? $product->unit }} verfügbar
                             </option>
                         @endforeach
                     </select>
@@ -169,7 +169,7 @@
                     @foreach ($products as $product)
                         <option value="{{ $product->id }}">
                             {{ $product->name }}
-                            | {{ number_format($product->available_stock, 2, ',', '.') }} {{ $unitLabels[$product->unit] ?? $product->unit }} verfügbar
+                            | {{ number_format($product->offer_editor_available_stock, 2, ',', '.') }} {{ $unitLabels[$product->unit] ?? $product->unit }} verfügbar
                         </option>
                     @endforeach
                 </select>

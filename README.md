@@ -1041,3 +1041,33 @@ wurden vereinheitlicht.
   Entwicklungs- oder CI-Umgebung ausgeführt werden.
 - Keine bestehenden Datenbank-IDs, Lagerbestände,
   Chargen oder Zuordnungen umnummeriert.
+
+## Lieferschein-Layout und Angebotseditor – Oktober 2026
+
+### Dynamisches Lieferschein-Layout
+
+- Angebots-Hinweise erscheinen unterhalb der Produktpositionen.
+- Automatische Seitenplanung anhand der Positionen und Hinweislänge.
+- Lange Hinweise werden auf Fortsetzungsseiten verteilt.
+- Unterstützt Lieferscheine mit und ohne Logo.
+- Footer und Eigentumsklausel bleiben vom Hinweis getrennt.
+- Neue zentrale Seitenberechnung in `DeliveryNoteLayout`.
+
+### Performance des Angebotseditors
+
+- Lagerbestände werden über Sammelabfragen vorbereitet.
+- Aktive Angebotsreservierungen werden berücksichtigt.
+- Aktive Filialausgänge werden berücksichtigt.
+- Die Bestandswerte werden in allen Produktauswahllisten verwendet.
+- Preise, Reservierungsregeln und Buchungen bleiben unverändert.
+
+### Prüfung
+
+- PHP-Syntax und Blade-Kompilierung erfolgreich geprüft.
+- PDF-Erzeugung auf dem Produktivserver geprüft.
+- Verbesserung der Bearbeitungsseite im Browser bestätigt.
+- Bei 583 Produkten wurden 11 Datenbankabfragen für das
+  Laden der Produktliste gemessen.
+- 36 Bestandswerte wurden gegen die bisherige Berechnung geprüft.
+- Regressionstests für beide Änderungen hinzugefügt.
+- Vollständige automatische Tests vor dem Merge über GitHub Actions.

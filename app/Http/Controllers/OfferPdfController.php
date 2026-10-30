@@ -37,7 +37,6 @@ class OfferPdfController extends Controller
             $html = view($pdfView, $viewData)->render();
             $html = $this->injectCartonCountIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
             $html = $this->injectCustomerDeliveryInstructionIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
-            $html = $this->injectOfferNoteIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
             $pdf = Pdf::loadHTML($html)->setPaper('a4');
         } else {
             $html = view($pdfView, $viewData)->render(); $html = $this->injectProductUnitColumnIntoOfferDocument($html, $offer, $isNoLogoPdfTemplate); $pdf = Pdf::loadHTML($html)->setPaper('a4');
@@ -164,76 +163,6 @@ class OfferPdfController extends Controller
                 $firstItemsWrap->setAttribute('style', trim($firstItemsWrap->getAttribute('style') . ';top:137mm;'));
             }
         }
-
-        $rendered = $dom->saveHTML();
-
-        if (! is_string($rendered)) {
-            return $html;
-        }
-
-        return (string) preg_replace('/^<\?xml encoding="UTF-8"\?>\s*/i', '', $rendered);
-    }
-
-    private function injectOfferNoteIntoDeliveryNote(string $html, Offer $offer, bool $isNoLogoPdfTemplate): string
-    {
-        $note = trim((string) ($offer->notes ?? ''));
-
-        if ($note === '') {
-            return $html;
-        }
-
-        $dom = new \DOMDocument('1.0', 'UTF-8');
-        $previousLibxmlState = libxml_use_internal_errors(true);
-        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-        libxml_use_internal_errors($previousLibxmlState);
-
-        if (! $loaded) {
-            return $html;
-        }
-
-        $xpath = new \DOMXPath($dom);
-        $pages = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " page ")]');
-
-        if ($pages === false || $pages->length === 0) {
-            return $html;
-        }
-
-        $lastPage = $pages->item($pages->length - 1);
-
-        if (! $lastPage instanceof \DOMElement) {
-            return $html;
-        }
-
-        $parent = $lastPage;
-
-        if (! $isNoLogoPdfTemplate) {
-            $content = $xpath->query('.//div[contains(concat(" ", normalize-space(@class), " "), " content ")]', $lastPage)->item(0);
-
-            if ($content instanceof \DOMElement) {
-                $parent = $content;
-            }
-        }
-
-        $noteBox = $dom->createElement('div');
-        $noteBox->setAttribute('class', 'offer-delivery-note-footer-note');
-        $noteBox->setAttribute(
-            'style',
-            $isNoLogoPdfTemplate
-                ? 'position:absolute;left:22mm;right:22mm;bottom:24mm;font-size:10pt;line-height:1.35;color:#111111;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;'
-                : 'position:absolute;left:12mm;right:12mm;bottom:70mm;font-size:9.5pt;line-height:1.35;color:#111111;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;'
-        );
-
-        $label = $dom->createElement('strong');
-        $label->appendChild($dom->createTextNode($isNoLogoPdfTemplate ? 'Note: ' : 'Hinweis: '));
-        $noteBox->appendChild($label);
-
-        $text = $dom->createElement('span');
-        $text->setAttribute('style', 'font-weight:400;color:#111111;');
-        $text->appendChild($dom->createTextNode($note));
-        $noteBox->appendChild($text);
-
-        $parent->appendChild($noteBox);
 
         $rendered = $dom->saveHTML();
 
