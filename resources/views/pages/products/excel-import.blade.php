@@ -68,13 +68,16 @@
         </p>
 
         <h3>Blatt Produkte</h3>
-        <pre data-csp-style="s-25aefbb2">product_code | name | manufacturer_designation | serial_number | unit | supplier | minimum_stock | description</pre>
+        <pre data-csp-style="s-25aefbb2">name | manufacturer_designation | serial_number | unit | supplier | minimum_stock | description</pre>
 
         <h3>Blatt Preisstaffeln</h3>
         <pre data-csp-style="s-25aefbb2">product_code | customer_group | tier_key | tier_label | min_grams | max_grams | price</pre>
 
         <p class="premium-muted">
             Erlaubte Werte für <strong>unit</strong>: gram, liter, piece.
+            Produkte werden ohne product_code anhand des eindeutigen Namens erkannt. Bisherige Dateien mit product_code bleiben beim Import unterstützt.
+            Beim Umbenennen bestehender Produkte muss die bisherige Zuordnung erhalten bleiben (z. B. durch Import mit product_code).
+            Im Blatt Preisstaffeln bleibt product_code für die eindeutige Preiszuordnung erforderlich.
             Produkte und Preise werden aktualisiert oder angelegt. Es wird nichts automatisch gelöscht.
         </p>
     </section>
