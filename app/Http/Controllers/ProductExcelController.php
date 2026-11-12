@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ProductPriceTier;
+use App\Models\Supplier;
 use App\Support\GermanNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class ProductExcelController extends Controller
     public function export(): BinaryFileResponse
     {
         $products = Product::query()
-            ->with(['priceTiers.customerGroup'])
+            ->with(['priceTiers.customerGroup', 'supplierRecord'])
             ->orderBy('name')
             ->get();
 
@@ -36,7 +37,6 @@ class ProductExcelController extends Controller
         $productsSheet->setTitle('Produkte');
         $productsSheet->fromArray([
             [
-                'product_code',
                 'name',
                 'manufacturer_designation',
                 'serial_number',
@@ -52,12 +52,11 @@ class ProductExcelController extends Controller
         foreach ($products as $product) {
             $productsSheet->fromArray([
                 [
-                    $product->product_code,
                     $product->name,
                     $product->manufacturer_designation,
                     $product->serial_number,
                     $product->unit,
-                    $product->supplier,
+                    $product->supplierRecord?->company_name ?: $product->supplier,
                     (float) $product->minimum_stock,
                     $product->description,
                 ],
@@ -68,12 +67,12 @@ class ProductExcelController extends Controller
 
         if ($row > 2) {
             $productsSheet
-                ->getStyle('G2:G' . ($row - 1))
+                ->getStyle('F2:F' . ($row - 1))
                 ->getNumberFormat()
                 ->setFormatCode('#,##0.00');
         }
 
-        foreach (range('A', 'H') as $column) {
+        foreach (range('A', 'G') as $column) {
             $productsSheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -153,6 +152,7 @@ class ProductExcelController extends Controller
         $createdProducts = 0;
         $updatedProducts = 0;
         $updatedPrices = 0;
+        $supplierIdsByName = [];
 
         DB::beginTransaction();
 
@@ -163,11 +163,6 @@ class ProductExcelController extends Controller
                 $productCode = $this->cleanString($row['product_code'] ?? null);
                 $name = $this->cleanString($row['name'] ?? null);
                 $unit = $this->cleanString($row['unit'] ?? null) ?: 'gram';
-
-                if ($productCode === '') {
-                    $errors[] = "Produkte Zeile {$line}: product_code fehlt.";
-                    continue;
-                }
 
                 if ($name === '') {
                     $errors[] = "Produkte Zeile {$line}: name fehlt.";
@@ -189,9 +184,38 @@ class ProductExcelController extends Controller
                     'description' => $this->nullableString($row['description'] ?? null),
                 ];
 
-                $product = Product::query()
-                    ->where('product_code', $productCode)
-                    ->first();
+                // Neue Exportdateien enthalten keine Produktkennung. Hier wird
+                // anhand des eindeutigen Produktnamens ein bestehender Datensatz gefunden.
+                $product = $productCode !== ''
+                    ? Product::query()->where('product_code', $productCode)->first()
+                    : Product::query()->where('name', $name)->first();
+
+                // Den sichtbaren Lieferantennamen wieder mit dem Stammdatensatz
+                // verknüpfen, damit Produktübersicht und Export übereinstimmen.
+                if (array_key_exists('supplier', $row)) {
+                    $supplierName = $this->nullableString($row['supplier']);
+
+                    if ($supplierName === null) {
+                        $productData['supplier_id'] = null;
+                    } else {
+                        if (! array_key_exists($supplierName, $supplierIdsByName)) {
+                            $supplierIdsByName[$supplierName] = Supplier::query()
+                                ->where('company_name', $supplierName)
+                                ->limit(2)
+                                ->pluck('id')
+                                ->all();
+                        }
+
+                        $matchingIds = $supplierIdsByName[$supplierName];
+
+                        if (count($matchingIds) > 1) {
+                            $errors[] = "Produkte Zeile {$line}: Lieferant {$supplierName} ist nicht eindeutig.";
+                            continue;
+                        }
+
+                        $productData['supplier_id'] = $matchingIds[0] ?? null;
+                    }
+                }
 
                 $duplicateNameQuery = Product::query()
                     ->where('name', $name);
@@ -209,9 +233,10 @@ class ProductExcelController extends Controller
                     $product->update($productData);
                     $updatedProducts++;
                 } else {
-                    $product = Product::create(array_merge($productData, [
-                        'product_code' => $productCode,
-                    ]));
+                    $product = Product::create(array_merge(
+                        $productData,
+                        $productCode !== '' ? ['product_code' => $productCode] : []
+                    ));
                     $createdProducts++;
                 }
 

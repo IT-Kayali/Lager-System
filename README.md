@@ -20,6 +20,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Verfügbarer Bestand unter Berücksichtigung aktiver Reservierungen
 - Sichere Produktlöschung: verwendete Produkte werden nicht aus historischen Vorgängen entfernt
 - Excel-Import und Excel-Export
+- Excel-Produktblatt ohne `product_code`; Lieferant wird aus dem verknüpften Lieferantenstamm (mit Text-Fallback) exportiert. Beim Import ohne `product_code` erfolgt der Abgleich über den eindeutigen Produktnamen; alte Dateien mit `product_code` werden weiterhin unterstützt. Das Preisstaffel-Blatt behält `product_code` zur eindeutigen Zuordnung. Eine Umbenennung per Excel ohne Kennung wird nicht automatisch als bestehendes Produkt erkannt.
 - Erweiterte Suche mit auswählbarem Suchfeld und „Exakter Wert“
 - Sortierung unter anderem nach Produktbezeichnung, Fake Name, Code und Lieferant
 - Natürliche Produktsortierung für numerische Namen, z. B. `2, 3, 10`
