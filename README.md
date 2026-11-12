@@ -14,6 +14,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 
 - Produktverwaltung mit Produktbezeichnung, Code-Nummer, Fake Name, Einheit und Lieferant
 - Kategorien mit Prioritäten
+- Produktübersicht mit eigener Kategorie-Spalte: alle zugeordneten Kategorien pro Produkt; bei fehlender Zuordnung `Ohne Kategorie`
 - Kategorien können Preisstaffeln aktivieren/deaktivieren
 - Mindestbestand und Warnschwellen
 - Verfügbarer Bestand unter Berücksichtigung aktiver Reservierungen
