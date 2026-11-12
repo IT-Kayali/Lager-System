@@ -75,6 +75,7 @@
                         <th>Fake Name</th>
                         <th>Code-Nummer</th>
                         <th>Lieferant</th>
+                        <th>Kategorie</th>
                         <th>Verfügbare Menge</th>
                         <th>Status</th>
                         <th>Aktionen</th>
@@ -100,6 +101,7 @@
                             <td>{{ $product->manufacturer_designation ?: '—' }}</td>
                             <td><span class="products-code">{{ $codeNumber }}</span></td>
                             <td>{{ $supplierName }}</td>
+                            <td>{{ $product->categories->pluck('name')->implode(', ') ?: 'Ohne Kategorie' }}</td>
                             <td>
                                 <span class="products-stock-value {{ $stockStatus }}">{{ number_format((float) $product->available_stock, 2, ',', '.') }}</span>
                                 <span class="unit-small">{{ $unitLabel }}</span>
@@ -141,7 +143,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="products-empty-state">
                                     <i class="bi bi-box-seam"></i>
                                     <strong>Noch keine Produkte vorhanden.</strong>
