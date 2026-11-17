@@ -128,7 +128,7 @@ class OfferPdfController extends Controller
         $textCell = $dom->createElement('td');
         $textCell->setAttribute(
             'style',
-            'padding-top:1.5mm;font-weight:400;color:#111111;line-height:1.3;white-space:normal;overflow-wrap:break-word;word-wrap:break-word;vertical-align:top;'
+            'padding-top:1.5mm;font-weight:700;color:#111111;line-height:1.3;white-space:normal;overflow-wrap:break-word;word-wrap:break-word;vertical-align:top;'
         );
         $textCell->appendChild($dom->createTextNode($instruction));
 
