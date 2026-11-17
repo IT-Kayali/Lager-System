@@ -16,11 +16,13 @@
         $canCreate = $isManager || $isSales || $isWarehouse;
         $createRoute = $isSales ? 'sales.branch-withdrawals.create' : 'branch-withdrawals.create';
         $indexRoute = $isSales ? 'sales.branch-withdrawals.index' : 'branch-withdrawals.index';
+        $showRoute = $isSales ? 'sales.branch-withdrawals.show' : 'branch-withdrawals.show';
         $allStatusOptions = \App\Models\BranchWithdrawal::statusLabels();
         $statusOptions = ($isWarehouse && ! $isManager)
             ? collect($allStatusOptions)->only([
                 \App\Models\BranchWithdrawal::STATUS_IN_PROGRESS,
                 \App\Models\BranchWithdrawal::STATUS_ISSUED,
+                \App\Models\BranchWithdrawal::STATUS_CANCELLED,
             ])->all()
             : $allStatusOptions;
         $hasBranchFilters = ! empty($search)
@@ -121,7 +123,7 @@
                         <tr>
                             <td>
                                 <div class="branch-number-cell">
-                                    <strong>{{ $withdrawal->withdrawal_number }}</strong>
+                                    <strong><a href="{{ route($showRoute, $withdrawal) }}">{{ $withdrawal->withdrawal_number }}</a></strong>
                                     <span>{{ $withdrawal->created_at?->format('d.m.Y H:i') }}</span>
                                 </div>
                             </td>
@@ -129,7 +131,7 @@
                             <td><span class="branch-name-pill"><i class="bi bi-shop-window"></i>{{ $withdrawal->branch_name }}</span></td>
 
                             <td>
-                                @if ($isWarehouse && ! $isManager)
+                                @if ($isWarehouse && ! $isManager && in_array($withdrawal->status, [\App\Models\BranchWithdrawal::STATUS_IN_PROGRESS, \App\Models\BranchWithdrawal::STATUS_ISSUED], true))
                                     <form method="POST" action="{{ route('branch-withdrawals.update', $withdrawal) }}" class="branch-status-form">
                                         @csrf
                                         @method('PUT')
@@ -160,6 +162,7 @@
 
                             <td>
                                 <div class="premium-actions branch-actions">
+                                    <a href="{{ route($showRoute, $withdrawal) }}" class="premium-icon-btn" title="Filialausgang ansehen" aria-label="Filialausgang ansehen"><i class="bi bi-eye"></i></a>
                                     @if ($isManager)
                                         <a href="{{ route('branch-withdrawals.edit', $withdrawal) }}" class="premium-icon-btn" title="Bearbeiten" aria-label="Filialausgang bearbeiten"><i class="bi bi-pencil"></i></a>
                                         <form method="POST" action="{{ route('branch-withdrawals.destroy', $withdrawal) }}" data-confirm="Filialausgang wirklich löschen? Bereits ausgegebene Mengen werden automatisch zurückgebucht.">
@@ -168,7 +171,7 @@
                                             <button type="submit" class="premium-icon-btn premium-danger" title="Löschen" aria-label="Filialausgang löschen"><i class="bi bi-trash"></i></button>
                                         </form>
                                     @elseif($isWarehouse)
-                                        <span class="branch-role-note">Status vor/zurück</span>
+                                        <span class="branch-role-note">{{ $withdrawal->status === \App\Models\BranchWithdrawal::STATUS_CANCELLED ? 'Nur Ansicht' : 'Status vor/zurück' }}</span>
                                     @elseif($isSales && $withdrawal->status === \App\Models\BranchWithdrawal::STATUS_OPEN)
                                         <a href="{{ route('sales.branch-withdrawals.edit', $withdrawal) }}" class="premium-icon-btn" title="Filialausgang bearbeiten" aria-label="Filialausgang bearbeiten"><i class="bi bi-pencil"></i></a>
                                     @else
@@ -183,7 +186,7 @@
                                 <div class="erp-list-empty">
                                     <i class="bi bi-shop"></i>
                                     <strong>Keine Filialausgänge gefunden.</strong>
-                                    <span>{{ $canCreate ? 'Passen die Filter nicht, kannst du einen neuen Filialausgang erstellen.' : 'Aktuell liegen keine Filialausgänge zur Bearbeitung vor.' }}</span>
+                                    <span>{{ $canCreate ? 'Passen die Filter nicht, kannst du einen neuen Filialausgang erstellen.' : 'Für diese Filter sind keine Filialausgänge vorhanden.' }}</span>
                                 </div>
                             </td>
                         </tr>
