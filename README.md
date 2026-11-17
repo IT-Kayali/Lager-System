@@ -77,6 +77,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Erweiterte Suche nach Filialausgang, Produkt, Mitarbeiter und Notiz
 - Filter nach Filiale und Status
 - Suche mit „Exakter Wert“
+- **Filialausgang-Historie:** Übergebene, ausgegebene und stornierte Filialausgänge bleiben für berechtigte Rollen in der Liste auffindbar und über eine schreibgeschützte Detailansicht mit Status, Mitarbeiter, Positionen und Notiz einsehbar. Verkauf kann auch nach Übergabe/Abschluss lesen, aber weiterhin nicht bearbeiten; Manager/Admin behalten ihre bisherigen Rechte. Im Lager bleiben noch nicht übergebene offene Verkaufsentwürfe unsichtbar, und stornierte Vorgänge sind ausschließlich lesbar.
 - Rollenbasierte Übergabe zwischen Verkauf und Lager:
   - Verkauf erstellt und bearbeitet den Vorgang im Status **Offen**
   - Verkauf übergibt mit **In Bearbeitung** an das Lager
