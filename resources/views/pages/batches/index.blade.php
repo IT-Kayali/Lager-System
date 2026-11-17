@@ -39,6 +39,8 @@
                 @endif
             </form>
         </div>
+        <a href="{{ route('batches.excel.export') }}" class="premium-btn erp-list-actions"><i class="bi bi-download"></i> Excel exportieren</a>
+        <a href="{{ route('batches.excel.import.form') }}" class="premium-btn erp-list-actions"><i class="bi bi-upload"></i> Excel importieren</a>
         <a href="{{ route('batches.create') }}" class="premium-btn gold batches-create-btn erp-list-actions"><i class="bi bi-plus-lg"></i> Charge hinzufügen</a>
     </section>
 

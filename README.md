@@ -37,6 +37,12 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 ### Chargen & FIFO
 
 - Wareneingänge und Chargenverwaltung
+- Chargenliste als Excel-Datei (`chargen.xlsx`) exportieren und importieren; im Chargenbereich stehen beide Aktionen direkt zur Verfügung.
+- Chargen-Excel-Import mit Vorschau und Einzelzeilenauswahl: neue Chargen anlegen, bestehende per interner ID (alternativ eindeutiger Batchnummer) aktualisieren und Chargennummern bei unveränderter Zuordnung umbenennen.
+- Importierte Mengenänderungen erzeugen protokollierte Lagerbewegungen (`in`/`adjustment`); für die Übernahme von Bestandsänderungen ist das Bestätigungswort `BESTAND` erforderlich. Die Datenbank wird erst bei Bestätigung geändert.
+- Bestandsreduzierungen unter den bereits für Angebote oder Filialausgänge reservierten Gesamtbestand werden verhindert.
+- Aus dem Export entfernte Zeilen werden **nicht** gelöscht oder archiviert. Stale Exportdaten und Änderungen seit der Vorschau werden zurückgewiesen; bestehende Reservierungen, Preise und historische Vorgänge werden nicht importiert.
+- Excel-Spalten: `batch_number`, `product`, `quantity`, `expires_at`, `received_at`. Verborgene IDs und Exportmetadaten dienen der sicheren Zuordnung. Neue Chargen setzen ein vorhandenes aktives Produkt voraus, leeres Ablaufdatum wird für neue Chargen aus der Standardfrist ermittelt.
 - Automatische Batchnummern
 - Konfigurierbares Standard-Ablaufdatum für neue Chargen
 - FIFO-Warenausgang nach ältester Charge
