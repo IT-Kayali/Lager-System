@@ -25,6 +25,12 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Sortierung unter anderem nach Produktbezeichnung, Fake Name, Code und Lieferant
 - Natürliche Produktsortierung für numerische Namen, z. B. `2, 3, 10`
 
+### Vorgemerkt: eigener Produktarchiv-Bereich
+
+- **Offene Folgeaufgabe:** Einen eigenen Archivbereich für archivierte Produkte mit Suche, Anzeige des Archivierungsgrundes und Möglichkeit zur Wiederherstellung ergänzen. Diese Oberfläche gehört **nicht** zum aktuellen Excel-Arbeitspaket und darf bei späteren Änderungen nicht vergessen werden.
+- Für den geplanten Produkt-Excel-Abgleich gilt: Entfernte Zeilen werden ausschließlich in einem ausdrücklich bestätigten Synchronisierungsmodus archiviert, niemals endgültig gelöscht. Historische Belege und Lagerbewegungen bleiben erhalten.
+- Der Produktimport/-export und der zukünftige Preisstaffelimport/-export auf der Seite **Preise** sind eigenständige Arbeitsabläufe. Der Produktimport darf Preise nicht überschreiben.
+
 ### Chargen & FIFO
 
 - Wareneingänge und Chargenverwaltung
