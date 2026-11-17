@@ -141,12 +141,13 @@ class BranchWithdrawalController extends Controller
             abort_unless(is_string($productName) && $productName !== '', 404);
 
             $selectedProduct = Product::query()
+                ->active()
                 ->where('name', $productName)
                 ->firstOrFail();
         } else {
             // Alte Links mit product_id bleiben funktionsfähig.
             $selectedProduct = $request->filled('product_id')
-                ? Product::query()->find($request->integer('product_id'))
+                ? Product::query()->active()->find($request->integer('product_id'))
                 : null;
         }
 
@@ -702,6 +703,7 @@ class BranchWithdrawalController extends Controller
     private function products()
     {
         return Product::query()
+            ->active()
             ->orderBy('name')
             ->get();
     }

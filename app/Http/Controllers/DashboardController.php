@@ -36,7 +36,7 @@ class DashboardController extends Controller
 
         $reservationReleaseService->releaseExpired();
 
-        $products = Schema::hasTable('products') ? Product::query()->get() : collect();
+        $products = Schema::hasTable('products') ? Product::query()->active()->get() : collect();
         $criticalProducts = $products->filter(fn (Product $product) => $product->stock_status === 'critical')->count();
         $lowProducts = $products->filter(fn (Product $product) => $product->stock_status === 'low')->count();
 

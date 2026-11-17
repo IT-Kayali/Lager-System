@@ -18,6 +18,7 @@ class PriceController extends Controller
     public function index(Request $request): View
     {
         $products = Product::query()
+            ->active()
             ->with('categories')
             ->orderBy('name')
             ->get(['id', 'product_code', 'name', 'unit']);
@@ -73,7 +74,7 @@ class PriceController extends Controller
             'customer_group_id' => ['required', 'integer', 'exists:customer_groups,id'],
         ]);
 
-        $product = Product::query()->with('categories')->findOrFail($selection['product_id']);
+        $product = Product::query()->active()->with('categories')->findOrFail($selection['product_id']);
         $group = CustomerGroup::findOrFail($selection['customer_group_id']);
 
         if ($product->usesPriceTiers()) {

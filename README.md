@@ -19,11 +19,20 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Mindestbestand und Warnschwellen
 - Verfügbarer Bestand unter Berücksichtigung aktiver Reservierungen
 - Sichere Produktlöschung: verwendete Produkte werden nicht aus historischen Vorgängen entfernt
-- Excel-Import und Excel-Export
-- Excel-Produktblatt ohne `product_code`; Lieferant wird aus dem verknüpften Lieferantenstamm (mit Text-Fallback) exportiert. Beim Import ohne `product_code` erfolgt der Abgleich über den eindeutigen Produktnamen; alte Dateien mit `product_code` werden weiterhin unterstützt. Das Preisstaffel-Blatt behält `product_code` zur eindeutigen Zuordnung. Eine Umbenennung per Excel ohne Kennung wird nicht automatisch als bestehendes Produkt erkannt.
+- Produkt-Excel-Export mit ausschließlich einem sichtbaren Blatt `Produkte` (ohne Produktcode und Preisstaffeln). Lieferanten werden aus dem verknüpften Stammdatensatz mit Text-Fallback exportiert. Eine ausgeblendete interne Produkt-ID erlaubt die zuverlässige Umbenennung.
+- Produkt-Excel-Import mit Vorschau, Einzelzeilenauswahl und den Modi **Aktualisieren** (keine Archivierung) und **Synchronisieren** (bewusst entfernte Exportzeilen nach ausdrücklicher Bestätigung archivieren).
+- Für das Synchronisieren ist ein vollständiger neuer Systemexport mit unveränderten ausgeblendeten Exportmetadaten nötig. Produkte, die erst nach dem Export hinzugefügt wurden, werden nicht archiviert. Bei inzwischen geänderten Produkten wird der Import abgelehnt; eine Vorschau allein führt keine Datenbankänderung aus.
+- Ohne interne ID wird der eindeutige Produktname verwendet; ältere Importdateien mit `product_code` bleiben im Aktualisierungsmodus unterstützt. Leere Excel-Felder lassen bestehende Werte bestehen; der Mindestbestand `0` wird übernommen. Alte Blätter `Preisstaffeln` werden ignoriert; der Import verändert keine bestehenden Preise oder Lagerbewegungen.
 - Erweiterte Suche mit auswählbarem Suchfeld und „Exakter Wert“
 - Sortierung unter anderem nach Produktbezeichnung, Fake Name, Code und Lieferant
 - Natürliche Produktsortierung für numerische Namen, z. B. `2, 3, 10`
+
+### Vorgemerkt: eigener Produktarchiv-Bereich
+
+- **Offene Folgeaufgabe:** Einen eigenen Archivbereich für archivierte Produkte mit Suche, Anzeige des Archivierungsgrundes und Möglichkeit zur Wiederherstellung ergänzen. Diese Oberfläche gehört **nicht** zum aktuellen Excel-Arbeitspaket und darf bei späteren Änderungen nicht vergessen werden.
+- Für den geplanten Produkt-Excel-Abgleich gilt: Entfernte Zeilen werden ausschließlich in einem ausdrücklich bestätigten Synchronisierungsmodus archiviert, niemals endgültig gelöscht. Historische Belege und Lagerbewegungen bleiben erhalten.
+- Der Produktimport/-export und der zukünftige Preisstaffelimport/-export auf der Seite **Preise** sind eigenständige Arbeitsabläufe. Der Produktimport darf Preise nicht überschreiben.
+- Archivierte Produkte bleiben als Datenbankdatensätze für historische Belege und Lagerbewegungen erhalten. Im normalen Produkt- und Preisbereich sowie in neuen Auswahllisten werden aktive Produkte angezeigt. Ein separates Archiv-Menü mit Such- und Wiederherstellungsfunktion muss noch entwickelt werden.
 
 ### Chargen & FIFO
 
@@ -73,6 +82,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 ### Angebote & Rechnungen
 
 - Angebotsverwaltung mit mehreren Produktpositionen
+- Der Angebotseditor berechnet verfügbare Mengen per Sammelabfragen für Chargen, Angebots- und Filialreservierungen; archivierte Produkte werden in der Neuauswahl ausgeblendet.
 - Automatische Lagerreservierung
 - Kundenauswahl mit Kundengruppe
 - Suchbare Dropdowns mit echten Platzhaltern
