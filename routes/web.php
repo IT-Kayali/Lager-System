@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BatchController;
+use App\Http\Controllers\BatchExcelController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\CustomerWalletTransactionController;
@@ -53,6 +54,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/kategorien', fn () => redirect()->route('product-categories.index'))->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('product-categories.redirect');
     Route::get('/batches/fifo-out', [BatchController::class, 'fifoOutForm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.fifo-out.form');
     Route::post('/batches/fifo-out', [BatchController::class, 'fifoOut'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.fifo-out.store');
+    Route::get('/batches/excel/export', [BatchExcelController::class, 'export'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.excel.export');
+    Route::get('/batches/excel/import', [BatchExcelController::class, 'importForm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.excel.import.form');
+    Route::post('/batches/excel/import', [BatchExcelController::class, 'import'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.excel.import');
+    Route::post('/batches/excel/import/confirm', [BatchExcelController::class, 'confirm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('batches.excel.import.confirm');
     Route::resource('batches', BatchController::class)->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE);
     Route::get('/branch-withdrawals', [\App\Http\Controllers\BranchWithdrawalController::class, 'index'])
         ->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)
