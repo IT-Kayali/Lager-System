@@ -213,6 +213,7 @@ Weitere PDF-Funktionen:
 - Einheitsspalte
 - Kartonanzahl auf Lieferschein bei Versandart Lieferung
 - dauerhafter Kundenhinweis im Kopfbereich des Lieferscheins
+- Die obere Kundennotiz (dauerhafter Lieferschein-Hinweis) wird in beiden Lieferschein-Vorlagen vollständig **fett** dargestellt. Die untere, bestellbezogene Notiz und die bestehende Seitenaufteilung werden dadurch nicht verändert.
 - Angebotsfeld **Notizen optional** wird bei Bedarf zusätzlich am Ende des Lieferscheins ausgegeben
 - Hinweisbeschriftung passend zur Vorlage:
   - `Hinweis:`
