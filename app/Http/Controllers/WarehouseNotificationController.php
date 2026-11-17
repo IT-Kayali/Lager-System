@@ -39,7 +39,10 @@ class WarehouseNotificationController extends Controller
 
         $notification->markAsRead();
 
-        if ($notification->type === WarehouseNotification::TYPE_OFFER) {
+        if (in_array($notification->type, [
+            WarehouseNotification::TYPE_OFFER,
+            WarehouseNotification::TYPE_OFFER_NOTE,
+        ], true)) {
             $offer = Offer::query()->find($notification->subject_id);
 
             if (! $offer || ! in_array($offer->status, [
@@ -50,6 +53,10 @@ class WarehouseNotificationController extends Controller
                 return redirect()
                     ->route('warehouse.offers.index')
                     ->with('error', 'Der Auftrag ist nicht mehr in der Lageransicht verfügbar.');
+            }
+
+            if ($notification->type === WarehouseNotification::TYPE_OFFER_NOTE) {
+                return redirect()->to(route('warehouse.offers.show', $offer) . '#warehouse-internal-notes');
             }
 
             return redirect()->route('warehouse.offers.show', $offer);
