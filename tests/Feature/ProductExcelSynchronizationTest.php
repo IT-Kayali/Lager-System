@@ -5,6 +5,7 @@ use App\Models\Product;
 use App\Models\ProductPriceTier;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -157,7 +158,12 @@ it('führt ohne vollständige Exportmetadaten niemals eine Archivierung durch', 
 it('weist eine veraltete Excel-Datei ab statt geänderte Produkte zu überschreiben', function () {
     $product = erp03Product('Zeitprodukt');
     $spreadsheet = erp03ExportWorkbook($this->actingAs(erp03Manager()));
-    $product->update(['description' => 'Nach Export geändert', 'updated_at' => now()->addMinute()]);
+    $exportStamp = $spreadsheet->getSheetByName('__product_sync')->getCell('B3')->getValue();
+    DB::table('products')->where('id', $product->id)->update([
+        'description' => 'Nach Export geändert',
+        'updated_at' => now()->addDay()->toDateTimeString(),
+    ]);
+    expect($product->fresh()->updated_at?->toIso8601String())->not->toBe($exportStamp);
     $upload = erp03WorkbookUpload($spreadsheet);
 
     try {
