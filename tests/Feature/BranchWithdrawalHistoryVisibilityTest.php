@@ -136,7 +136,10 @@ it('allows managers and admins to view all states but denies unrelated roles', f
     $this->actingAs($crm)->get(route('sales.branch-withdrawals.show', $issued))->assertForbidden();
 
     $inactive = User::factory()->create(['role' => User::ROLE_SALES, 'is_active' => false]);
-    $this->actingAs($inactive)->get(route('sales.branch-withdrawals.show', $issued))->assertForbidden();
+    // Die globale EnsureActiveUser-Middleware meldet deaktivierte Benutzer ab.
+    $this->actingAs($inactive)
+        ->get(route('sales.branch-withdrawals.show', $issued))
+        ->assertRedirect(route('login'));
 
     auth()->logout();
     $this->get(route('branch-withdrawals.show', $issued))->assertRedirect(route('login'));
