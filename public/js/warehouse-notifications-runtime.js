@@ -37,7 +37,7 @@
                     if (items.length === 0) {
                         const empty = document.createElement('div');
                         empty.className = 'warehouse-notification-empty';
-                        empty.textContent = 'Keine neuen Lageraufträge.';
+                        empty.textContent = 'Keine neuen Lageraufträge oder Notizen.';
                         list.appendChild(empty);
                         return;
                     }
@@ -53,14 +53,16 @@
                         const iconElement = document.createElement('i');
                         iconElement.className = item.type === 'offer'
                             ? 'bi bi-receipt-cutoff'
-                            : 'bi bi-shop';
+                            : item.type === 'offer_note'
+                                ? 'bi bi-chat-left-text'
+                                : 'bi bi-shop';
                         icon.appendChild(iconElement);
 
                         const copy = document.createElement('span');
                         copy.className = 'warehouse-notification-item-copy';
 
                         const title = document.createElement('strong');
-                        title.textContent = item.title || 'Neuer Lagerauftrag';
+                        title.textContent = item.title || 'Neue Lager-Benachrichtigung';
                         copy.appendChild(title);
 
                         if (item.message) {
@@ -104,6 +106,15 @@
                 button.addEventListener('click', function (event) {
                     event.stopPropagation();
                     setOpen(panel.hidden);
+                    if (!panel.hidden) {
+                        refreshNotifications();
+                    }
+                });
+
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden) {
+                        refreshNotifications();
+                    }
                 });
 
                 panel.addEventListener('click', function (event) {
