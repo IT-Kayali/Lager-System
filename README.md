@@ -130,13 +130,16 @@ Für die Rolle **Lager** gibt es persistente Benachrichtigungen für neu überge
 
 - neue Benachrichtigung bei **Angebot → In Bearbeitung**
 - neue Benachrichtigung bei **Filialausgang → In Bearbeitung**
-- Glocke mit rotem Ungelesen-Zähler im Lager-Benutzerbereich der Sidebar
+- **Neue interne Bestellnotizen:** Wird in einer bereits für das Lager sichtbaren Bestellung (In Bearbeitung, Abholbereit oder Erledigt) eine neue interne Notiz geschrieben, erhalten alle anderen aktiven Lager-Mitarbeiter je eine eigene ungelesene Benachrichtigung. Verkäufer- und Manager-Notizen werden an alle aktiven Lager-Mitarbeiter gemeldet, Lagermitarbeiter erhalten keine Eigenbenachrichtigung.
+- Die Meldung nennt die Bestellung, den Verfasser und einen kurzen Notiz-Auszug. Ein Klick führt direkt zur internen Notizsektion der Lager-Bestellung. Jede Notiz hat einen unabhängigen Gelesen-Status pro Empfänger.
+- Vor der Übergabe angelegte Notizen werden aus Rollen- und Datenschutzgründen nicht direkt ans Lager gemeldet; sie sind nach der Übergabe im Auftrag lesbar. Bei Rückgabe oder Stornierung werden nicht mehr gültige Lager- und Notizmeldungen ausgeblendet.
+- Glocke mit rotem Ungelesen-Zähler für Aufträge und Notizen im Lager-Benutzerbereich der Sidebar
 - Benachrichtigungen bleiben nach Neuladen, Abmelden und erneutem Anmelden erhalten
 - Öffnen der Benachrichtigungsliste markiert nichts als gelesen
 - erst der Klick auf eine konkrete Benachrichtigung markiert genau diese Meldung als gelesen
 - Angebotsmeldungen öffnen direkt den Lagerauftrag
 - Filialausgangsmeldungen öffnen die gefilterte Filialausgangsansicht
-- automatische Aktualisierung des Zählers im Browser
+- automatische Aktualisierung des Zählers im Browser (alle 20 Sekunden sowie beim Öffnen der Glocke und nach erneutem Aktivieren des Tabs)
 - eigener Gelesen/Ungelesen-Stand pro Lager-Mitarbeiter
 - Rückgabe eines Auftrags an Verkauf entfernt nicht mehr gültige Lagerbenachrichtigungen
 - Benachrichtigungsrouten sind serverseitig ausschließlich für die Rolle **Lager** zugelassen
