@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CustomerGroup;
 use App\Models\Product;
-use App\Models\ProductPriceTier;
-use App\Models\Supplier;
-use App\Support\GermanNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -21,15 +19,10 @@ class ProductExcelController extends Controller
     public function export(): BinaryFileResponse
     {
         $products = Product::query()
-            ->with(['priceTiers.customerGroup', 'supplierRecord'])
+            ->active()
+            ->with('supplierRecord')
             ->orderBy('name')
             ->get();
-
-        foreach ($products as $product) {
-            ProductPriceTier::ensureForProduct($product);
-        }
-
-        $products->load(['priceTiers.customerGroup']);
 
         $spreadsheet = new Spreadsheet();
 
@@ -44,6 +37,7 @@ class ProductExcelController extends Controller
                 'supplier',
                 'minimum_stock',
                 'description',
+                '_internal_id',
             ],
         ]);
 
@@ -59,6 +53,7 @@ class ProductExcelController extends Controller
                     $product->supplierRecord?->company_name ?: $product->supplier,
                     (float) $product->minimum_stock,
                     $product->description,
+                    $product->id,
                 ],
             ], null, 'A' . $row);
 
@@ -75,60 +70,29 @@ class ProductExcelController extends Controller
         foreach (range('A', 'G') as $column) {
             $productsSheet->getColumnDimension($column)->setAutoSize(true);
         }
+        $productsSheet->getColumnDimension('H')->setVisible(false);
 
-        $priceSheet = $spreadsheet->createSheet();
-        $priceSheet->setTitle('Preisstaffeln');
-        $priceSheet->fromArray([
-            [
-                'product_code',
-                'customer_group',
-                'tier_key',
-                'tier_label',
-                'min_grams',
-                'max_grams',
-                'price',
-            ],
-        ]);
-
-        $row = 2;
-
-        foreach ($products as $product) {
-            foreach ($product->priceTiers->sortBy(['customer_group_id', 'min_grams']) as $tier) {
-                $priceSheet->fromArray([
-                    [
-                        $product->product_code,
-                        $tier->customerGroup?->slug ?: $tier->customerGroup?->name,
-                        $tier->tier_key,
-                        $tier->tier_label,
-                        $tier->min_grams,
-                        $tier->max_grams,
-                        (float) $tier->price,
-                    ],
-                ], null, 'A' . $row);
-
-                $row++;
-            }
+        // Der ausgeblendete Metadatenbereich enthält die ursprüngliche vollständige
+        // Exportmenge. Nur so lassen sich bewusst entfernte Zeilen archivieren,
+        // ohne später erstellte Produkte versehentlich zu erfassen.
+        $metadata = $spreadsheet->createSheet();
+        $metadata->setTitle('__product_sync');
+        $metadata->fromArray([['lager-product-export-v1'], ['product_id', 'updated_at']]);
+        foreach ($products as $position => $product) {
+            $metadata->fromArray([
+                [$product->id, $product->updated_at?->toIso8601String()],
+            ], null, 'A' . ($position + 3));
         }
-
-        if ($row > 2) {
-            $priceSheet
-                ->getStyle('G2:G' . ($row - 1))
-                ->getNumberFormat()
-                ->setFormatCode('#,##0.00');
-        }
-
-        foreach (range('A', 'G') as $column) {
-            $priceSheet->getColumnDimension($column)->setAutoSize(true);
-        }
+        $metadata->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
 
         $spreadsheet->setActiveSheetIndex(0);
 
-        $path = storage_path('app/produkte-preise-' . now()->format('Y-m-d-His') . '.xlsx');
+        $path = storage_path('app/produkte-' . Str::uuid() . '.xlsx');
 
         (new Xlsx($spreadsheet))->save($path);
 
         return response()
-            ->download($path, 'produkte-preise.xlsx')
+            ->download($path, 'produkte.xlsx')
             ->deleteFileAfterSend(true);
     }
 
@@ -137,296 +101,93 @@ class ProductExcelController extends Controller
         return view('pages.products.excel-import');
     }
 
-    public function import(Request $request): RedirectResponse
+    public function import(Request $request, \App\Support\ProductExcelImportPlan $service): View|RedirectResponse
     {
         $data = $request->validate([
-            'excel_file' => ['required', 'file', 'mimes:xlsx,xls'],
+            'excel_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+            'import_mode' => ['required', 'in:update,sync'],
         ]);
 
-        $spreadsheet = IOFactory::load($data['excel_file']->getRealPath());
-
-        $productRows = $this->sheetRows($spreadsheet, 'Produkte');
-        $priceRows = $this->sheetRows($spreadsheet, 'Preisstaffeln');
-
-        $errors = [];
-        $createdProducts = 0;
-        $updatedProducts = 0;
-        $updatedPrices = 0;
-        $supplierIdsByName = [];
-
-        DB::beginTransaction();
-
         try {
-            foreach ($productRows as $index => $row) {
-                $line = $index + 2;
-
-                $productCode = $this->cleanString($row['product_code'] ?? null);
-                $name = $this->cleanString($row['name'] ?? null);
-                $unit = $this->cleanString($row['unit'] ?? null) ?: 'gram';
-
-                if ($name === '') {
-                    $errors[] = "Produkte Zeile {$line}: name fehlt.";
-                    continue;
-                }
-
-                if (! in_array($unit, ['gram', 'liter', 'piece'], true)) {
-                    $errors[] = "Produkte Zeile {$line}: unit muss gram, liter oder piece sein.";
-                    continue;
-                }
-
-                $productData = [
-                    'name' => $name,
-                    'manufacturer_designation' => $this->nullableString($row['manufacturer_designation'] ?? null),
-                    'serial_number' => $this->nullableString($row['serial_number'] ?? null),
-                    'unit' => $unit,
-                    'supplier' => $this->nullableString($row['supplier'] ?? null),
-                    'minimum_stock' => $this->decimal($row['minimum_stock'] ?? 0),
-                    'description' => $this->nullableString($row['description'] ?? null),
-                ];
-
-                // Neue Exportdateien enthalten keine Produktkennung. Hier wird
-                // anhand des eindeutigen Produktnamens ein bestehender Datensatz gefunden.
-                $product = $productCode !== ''
-                    ? Product::query()->where('product_code', $productCode)->first()
-                    : Product::query()->where('name', $name)->first();
-
-                // Den sichtbaren Lieferantennamen wieder mit dem Stammdatensatz
-                // verknüpfen, damit Produktübersicht und Export übereinstimmen.
-                if (array_key_exists('supplier', $row)) {
-                    $supplierName = $this->nullableString($row['supplier']);
-
-                    if ($supplierName === null) {
-                        $productData['supplier_id'] = null;
-                    } else {
-                        if (! array_key_exists($supplierName, $supplierIdsByName)) {
-                            $supplierIdsByName[$supplierName] = Supplier::query()
-                                ->where('company_name', $supplierName)
-                                ->limit(2)
-                                ->pluck('id')
-                                ->all();
-                        }
-
-                        $matchingIds = $supplierIdsByName[$supplierName];
-
-                        if (count($matchingIds) > 1) {
-                            $errors[] = "Produkte Zeile {$line}: Lieferant {$supplierName} ist nicht eindeutig.";
-                            continue;
-                        }
-
-                        $productData['supplier_id'] = $matchingIds[0] ?? null;
-                    }
-                }
-
-                $duplicateNameQuery = Product::query()
-                    ->where('name', $name);
-
-                if ($product !== null) {
-                    $duplicateNameQuery->where('id', '!=', $product->id);
-                }
-
-                if ($duplicateNameQuery->exists()) {
-                    $errors[] = "Produkte Zeile {$line}: Der Produktname {$name} wird bereits von einem anderen Produkt verwendet.";
-                    continue;
-                }
-
-                if ($product) {
-                    $product->update($productData);
-                    $updatedProducts++;
-                } else {
-                    $product = Product::create(array_merge(
-                        $productData,
-                        $productCode !== '' ? ['product_code' => $productCode] : []
-                    ));
-                    $createdProducts++;
-                }
-
-                ProductPriceTier::ensureForProduct($product);
+            $spreadsheet = IOFactory::load($data['excel_file']->getRealPath());
+            try {
+                $plan = $service->prepare($spreadsheet, $data['import_mode']);
+            } finally {
+                $spreadsheet->disconnectWorksheets();
             }
-
-            foreach ($priceRows as $index => $row) {
-                $line = $index + 2;
-
-                $productCode = $this->cleanString($row['product_code'] ?? null);
-                $customerGroupValue = $this->cleanString($row['customer_group'] ?? null);
-                $tierKey = $this->cleanString($row['tier_key'] ?? null);
-
-                if ($productCode === '') {
-                    $errors[] = "Preisstaffeln Zeile {$line}: product_code fehlt.";
-                    continue;
-                }
-
-                if ($customerGroupValue === '') {
-                    $errors[] = "Preisstaffeln Zeile {$line}: customer_group fehlt.";
-                    continue;
-                }
-
-                if ($tierKey === '') {
-                    $errors[] = "Preisstaffeln Zeile {$line}: tier_key fehlt.";
-                    continue;
-                }
-
-                $product = Product::query()
-                    ->where('product_code', $productCode)
-                    ->first();
-
-                if (! $product) {
-                    $errors[] = "Preisstaffeln Zeile {$line}: Produkt {$productCode} nicht gefunden.";
-                    continue;
-                }
-
-                $group = CustomerGroup::query()
-                    ->where('slug', $customerGroupValue)
-                    ->orWhere('name', $customerGroupValue)
-                    ->first();
-
-                if (! $group) {
-                    $errors[] = "Preisstaffeln Zeile {$line}: Kundengruppe {$customerGroupValue} nicht gefunden.";
-                    continue;
-                }
-
-                $defaultTier = ProductPriceTier::definitionForKey($tierKey);
-
-                $tierLabel = $this->cleanString($row['tier_label'] ?? null)
-                    ?: ($defaultTier?->label ?? $tierKey);
-
-                $minGrams = $this->integer(
-                    $row['min_grams'] ?? null,
-                    $defaultTier?->min_grams ?? 0
-                );
-                $maxGrams = $this->nullableInteger(
-                    $row['max_grams'] ?? null,
-                    $defaultTier?->max_grams
-                );
-                $price = $this->decimal($row['price'] ?? 0);
-
-                ProductPriceTier::query()->updateOrCreate(
-                    [
-                        'product_id' => $product->id,
-                        'customer_group_id' => $group->id,
-                        'tier_key' => $tierKey,
-                    ],
-                    [
-                        'tier_label' => $tierLabel,
-                        'min_grams' => $minGrams,
-                        'max_grams' => $maxGrams,
-                        'price' => $price,
-                    ]
-                );
-
-                $updatedPrices++;
-            }
-
-            if ($errors !== []) {
-                DB::rollBack();
-
-                return back()
-                    ->withInput()
-                    ->with('error', 'Import wurde wegen Fehlern abgebrochen.')
-                    ->with('import_errors', $errors);
-            }
-
-            DB::commit();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
-            DB::rollBack();
-
             report($exception);
 
-            return back()
-                ->withInput()
-                ->with('error', 'Der Excel-Import konnte nicht abgeschlossen werden. Bitte die Datei prüfen oder einen Administrator kontaktieren.');
+            return back()->with('error', 'Die Excel-Datei konnte nicht gelesen werden. Bitte eine gültige Excel-Datei hochladen.');
         }
 
-        return redirect()
-            ->route('products.index')
-            ->with('success', "Excel-Import abgeschlossen. Produkte neu: {$createdProducts}, Produkte aktualisiert: {$updatedProducts}, Preise aktualisiert: {$updatedPrices}.");
+        $token = Str::random(48);
+        Cache::put($this->previewKey($token), $plan, now()->addMinutes(30));
+
+        return view('pages.products.excel-import', [
+            'preview' => $plan,
+            'previewToken' => $token,
+        ]);
     }
 
-    private function sheetRows(Spreadsheet $spreadsheet, string $sheetName): array
+    public function confirm(Request $request, \App\Support\ProductExcelImportPlan $service): RedirectResponse
     {
-        $sheet = $spreadsheet->getSheetByName($sheetName);
+        $data = $request->validate([
+            'preview_token' => ['required', 'string', 'size:48'],
+            'selected_rows' => ['nullable', 'array'],
+            'selected_rows.*' => ['integer', 'min:2'],
+            'archive_ids' => ['nullable', 'array'],
+            'archive_ids.*' => ['integer', 'min:1'],
+            'archive_confirmation' => ['nullable', 'string'],
+        ]);
 
-        if (! $sheet) {
-            return [];
+        $key = $this->previewKey($data['preview_token']);
+        $plan = Cache::get($key);
+
+        if (! is_array($plan)) {
+            return redirect()->route('products.excel.import.form')
+                ->with('error', 'Die Importvorschau ist abgelaufen. Bitte die Datei erneut hochladen.');
         }
 
-        $rows = $sheet->toArray(null, true, true, true);
+        $lines = array_values(array_unique(array_map('intval', $data['selected_rows'] ?? [])));
+        $archiveIds = array_values(array_unique(array_map('intval', $data['archive_ids'] ?? [])));
 
-        if ($rows === []) {
-            return [];
+        $allowedLines = array_column($plan['rows'], 'line');
+        $allowedArchives = array_column($plan['archives'], 'id');
+
+        if (array_diff($lines, $allowedLines) !== [] || array_diff($archiveIds, $allowedArchives) !== []) {
+            return redirect()->route('products.excel.import.form')
+                ->with('error', 'Die Auswahl der Importzeilen ist ungültig. Bitte die Vorschau erneut erstellen.');
         }
 
-        $headerRow = array_shift($rows);
-        $headers = [];
-
-        foreach ($headerRow as $column => $value) {
-            $header = strtolower(trim((string) $value));
-
-            if ($header !== '') {
-                $headers[$column] = $header;
-            }
+        if ($archiveIds !== [] && ($data['archive_confirmation'] ?? '') !== 'ARCHIVIEREN') {
+            return redirect()->route('products.excel.import.form')
+                ->with('error', 'Zur Archivierung bitte das Bestätigungswort ARCHIVIEREN eintragen.');
         }
 
-        $mappedRows = [];
-
-        foreach ($rows as $row) {
-            $mapped = [];
-            $hasValue = false;
-
-            foreach ($headers as $column => $header) {
-                $value = $row[$column] ?? null;
-                $mapped[$header] = $value;
-
-                if ($this->cleanString($value) !== '') {
-                    $hasValue = true;
-                }
-            }
-
-            if ($hasValue) {
-                $mappedRows[] = $mapped;
-            }
+        try {
+            $result = $service->apply($plan, $lines, $archiveIds);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return redirect()->route('products.excel.import.form')
+                ->with('error', $exception->validator->errors()->first('excel_file'));
+        } catch (\Throwable $exception) {
+            report($exception);
+            return redirect()->route('products.excel.import.form')
+                ->with('error', 'Import wurde ohne Änderungen abgebrochen. Bitte Protokoll prüfen und neu versuchen.');
         }
 
-        return $mappedRows;
+        Cache::forget($key);
+
+        return redirect()->route('products.index')->with(
+            'success',
+            "Excel-Abgleich abgeschlossen: {$result['created']} neu, {$result['updated']} aktualisiert, {$result['restored']} reaktiviert, {$result['archived']} archiviert."
+        );
     }
 
-    private function cleanString(mixed $value): string
+    private function previewKey(string $token): string
     {
-        return trim((string) $value);
-    }
-
-    private function nullableString(mixed $value): ?string
-    {
-        $value = $this->cleanString($value);
-
-        return $value === '' ? null : $value;
-    }
-
-    private function decimal(mixed $value): float
-    {
-        $normalized = GermanNumber::parse($this->cleanString($value));
-
-        return round((float) $normalized, 2);
-    }
-
-    private function integer(mixed $value, int $default = 0): int
-    {
-        $value = $this->cleanString($value);
-
-        if ($value === '') {
-            return $default;
-        }
-
-        return (int) $value;
-    }
-
-    private function nullableInteger(mixed $value, ?int $default = null): ?int
-    {
-        $value = $this->cleanString($value);
-
-        if ($value === '') {
-            return $default;
-        }
-
-        return (int) $value;
+        return 'product-excel-import:' . auth()->id() . ':' . $token;
     }
 }

@@ -78,6 +78,7 @@ class SupplierController extends Controller
     public function show(Supplier $supplier): View
     {
         $products = Product::query()
+            ->active()
             ->with(['categories', 'batches', 'supplierRecord'])
             ->where(function ($query) use ($supplier) {
                 $query->where('supplier_id', $supplier->id)

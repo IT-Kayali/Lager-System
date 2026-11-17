@@ -21,13 +21,20 @@ class Product extends Model
         'supplier_id',
         'minimum_stock',
         'description',
+        'archived_at',
     ];
 
     protected function casts(): array
     {
         return [
             'minimum_stock' => 'decimal:3',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereNull('products.archived_at');
     }
 
     protected static function booted(): void

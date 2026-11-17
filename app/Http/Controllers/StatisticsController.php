@@ -46,6 +46,7 @@ class StatisticsController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'products' => Product::query()
+                ->active()
                 ->orderBy('name')
                 ->get(['id', 'product_code', 'name']),
             'categories' => ProductCategory::query()

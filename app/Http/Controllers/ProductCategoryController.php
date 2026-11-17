@@ -31,7 +31,7 @@ class ProductCategoryController extends Controller
         }
 
         $categories = ProductCategory::query()
-            ->withCount('products')
+            ->withCount(['products' => fn ($query) => $query->active()])
             ->when($search !== '', function ($query) use ($search, $searchField, $exact) {
                 $operator = $exact ? '=' : 'like';
                 $value = $exact ? $search : "%{$search}%";
@@ -87,6 +87,7 @@ class ProductCategoryController extends Controller
     {
         $productCategory->load([
             'products' => fn ($query) => $query
+                ->active()
                 ->with('supplierRecord')
                 ->naturalNameOrder(),
         ]);

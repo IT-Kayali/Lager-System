@@ -238,7 +238,7 @@ class OfferController extends Controller
         return auth()->user()?->isManager() ?? false;
     }
     private function customers(): Collection { return Customer::query()->with('group')->orderByRaw('LOWER(company_name) ASC')->get(); }
-    private function products(): Collection { return Product::query()->with(['categories', 'priceTiers', 'manualPriceRules'])->naturalNameOrder()->get(); }
+    private function products(): Collection { return Product::query()->active()->with(['categories', 'priceTiers', 'manualPriceRules'])->naturalNameOrder()->get(); }
     private function templates(): array { return ['with_company' => 'Mit Firmendaten & Logo', 'without_company' => 'Ohne Firmendaten & Logo']; }
     private function statuses(): array { return Offer::STATUS_LABELS; }
     private function normalizeShippingData(array $data): array

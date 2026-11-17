@@ -46,6 +46,21 @@ function erp02Upload(array $headers, array $values): UploadedFile
     );
 }
 
+function erp02ConfirmUpload(Tests\TestCase $test, UploadedFile $upload): void
+{
+    $preview = $test->actingAs(erp02Manager())
+        ->post(route('products.excel.import'), [
+            'excel_file' => $upload,
+            'import_mode' => 'update',
+        ])->assertOk();
+
+    $test->post(route('products.excel.import.confirm'), [
+        'preview_token' => $preview->viewData('previewToken'),
+        'selected_rows' => [2],
+    ])->assertRedirect(route('products.index'))
+        ->assertSessionHas('success');
+}
+
 it('exportiert Lieferanten aus den Stammdaten ohne product_code im Produktblatt', function () {
     $supplier = Supplier::query()->create([
         'company_name' => 'Hauptlieferant GmbH',
@@ -81,9 +96,11 @@ it('exportiert Lieferanten aus den Stammdaten ohne product_code im Produktblatt'
         expect($productsSheet->getCell('E2')->getValue())->toBe('Hauptlieferant GmbH')
             ->and($productsSheet->getCell('E3')->getValue())->toBe('Freitextlieferant');
 
-        $priceSheet = $spreadsheet->getSheetByName('Preisstaffeln');
-        expect($priceSheet)->not->toBeNull()
-            ->and($priceSheet->getCell('A1')->getValue())->toBe('product_code');
+        expect($spreadsheet->getSheetByName('Preisstaffeln'))->toBeNull();
+        expect($productsSheet->getCell('H1')->getValue())->toBe('_internal_id');
+        expect($productsSheet->getColumnDimension('H')->getVisible())->toBeFalse();
+        expect($productsSheet->getCell('H2')->getValue())->toBe($linkedProduct->id);
+        expect($spreadsheet->getSheetByName('__product_sync'))->not->toBeNull();
     } finally {
         $spreadsheet->disconnectWorksheets();
         if (is_file($path)) {
@@ -105,10 +122,7 @@ it('importiert das neue Produktblatt anhand des eindeutigen Namens und verknüpf
     );
 
     try {
-        $this->actingAs(erp02Manager())
-            ->post(route('products.excel.import'), ['excel_file' => $upload])
-            ->assertRedirect(route('products.index'))
-            ->assertSessionHas('success');
+        erp02ConfirmUpload($this, $upload);
     } finally {
         @unlink($upload->getRealPath());
     }
@@ -130,10 +144,7 @@ it('legt Produkte ohne product_code mit automatisch erzeugter Kennung an', funct
     );
 
     try {
-        $this->actingAs(erp02Manager())
-            ->post(route('products.excel.import'), ['excel_file' => $upload])
-            ->assertRedirect(route('products.index'))
-            ->assertSessionHas('success');
+        erp02ConfirmUpload($this, $upload);
     } finally {
         @unlink($upload->getRealPath());
     }
@@ -151,10 +162,7 @@ it('unterstützt weiterhin ältere Excel-Importe mit product_code auch beim Umbe
     );
 
     try {
-        $this->actingAs(erp02Manager())
-            ->post(route('products.excel.import'), ['excel_file' => $upload])
-            ->assertRedirect(route('products.index'))
-            ->assertSessionHas('success');
+        erp02ConfirmUpload($this, $upload);
     } finally {
         @unlink($upload->getRealPath());
     }

@@ -36,6 +36,7 @@ class ProductController extends Controller
         }
 
         $products = Product::query()
+            ->active()
             ->with('categories')
             ->with('supplierRecord')
             ->with(['batches' => fn ($query) => $query->orderBy('received_at')->orderBy('id')])

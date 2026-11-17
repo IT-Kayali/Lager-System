@@ -140,6 +140,7 @@ class WarningController extends Controller
     private function productRows(): Collection
     {
         return Product::query()
+            ->active()
             ->with([
                 'supplierRecord',
                 'batches' => fn ($query) => $query->orderBy('received_at')->orderBy('id'),
