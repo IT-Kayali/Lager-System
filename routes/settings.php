@@ -130,6 +130,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('sales.branch-withdrawals.store')
         ->middleware('role:'.User::ROLE_SALES);
 
+    Route::get('verkauf/filialausgaenge/{branchWithdrawal}', [BranchWithdrawalController::class, 'show'])
+        ->name('sales.branch-withdrawals.show')
+        ->middleware('role:'.User::ROLE_SALES);
+
     Route::get('verkauf/filialausgaenge/{branchWithdrawal}/bearbeiten', [BranchWithdrawalController::class, 'edit'])
         ->name('sales.branch-withdrawals.edit')
         ->middleware('role:'.User::ROLE_SALES);

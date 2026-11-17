@@ -68,6 +68,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/branch-withdrawals', [\App\Http\Controllers\BranchWithdrawalController::class, 'store'])
         ->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)
         ->name('branch-withdrawals.store');
+    Route::get('/branch-withdrawals/{branchWithdrawal}', [\App\Http\Controllers\BranchWithdrawalController::class, 'show'])
+        ->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)
+        ->name('branch-withdrawals.show');
 
     Route::get('/offers', [OfferController::class, 'index'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('offers.index');
     Route::get('/offers/create', [OfferController::class, 'create'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('offers.create');
