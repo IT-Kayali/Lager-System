@@ -21,6 +21,21 @@
         .branch-note-text{display:inline-block;max-width:260px;color:#3a332a;font-weight:750}
         .branch-actions{gap:8px}
 
+/* Schreibgeschützte Detailansicht für abgeschlossene und übergebene Filialausgänge */
+.branch-detail-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.branch-detail-card{margin-bottom:20px}
+.branch-detail-card h2{margin:0 0 18px;font-size:22px}
+.branch-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:22px}
+.branch-detail-heading h2{margin:0 0 4px}
+.branch-detail-heading p{margin:0}
+.branch-detail-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:0}
+.branch-detail-meta>div{padding:15px;border:1px solid #e7dece;border-radius:12px;background:#faf7f0;min-width:0}
+.branch-detail-meta dt{font-size:12px;font-weight:850;color:#665f54;margin-bottom:6px}
+.branch-detail-meta dd{font-weight:800;color:#111;margin:0;overflow-wrap:anywhere}
+.branch-detail-note{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+@media(max-width:800px){.branch-detail-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.branch-detail-meta{grid-template-columns:1fr}.branch-detail-actions .premium-btn{width:100%;justify-content:center}}
+
 /* resources/views/pages/branch-withdrawals/_form.blade.php block 1 */
 .branch-editor-form { display:grid; gap:22px; }
     .branch-editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,420px); gap:22px; align-items:start; }
