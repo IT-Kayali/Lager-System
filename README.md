@@ -82,6 +82,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 ### Angebote & Rechnungen
 
 - Angebotsverwaltung mit mehreren Produktpositionen
+- Der Angebotseditor berechnet verfügbare Mengen per Sammelabfragen für Chargen, Angebots- und Filialreservierungen; archivierte Produkte werden in der Neuauswahl ausgeblendet.
 - Automatische Lagerreservierung
 - Kundenauswahl mit Kundengruppe
 - Suchbare Dropdowns mit echten Platzhaltern
