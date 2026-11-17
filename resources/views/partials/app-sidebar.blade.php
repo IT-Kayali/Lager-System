@@ -232,7 +232,7 @@
 
                     <div class="warehouse-notification-panel" id="warehouse-notification-panel" hidden>
                         <div class="warehouse-notification-panel-head">
-                            <strong>Neue Lageraufträge</strong>
+                            <strong>Neue Lageraufträge und Notizen</strong>
                             <span id="warehouse-notification-panel-count">{{ $warehouseUnreadCount }}</span>
                         </div>
 
@@ -243,7 +243,7 @@
                                     class="warehouse-notification-item"
                                 >
                                     <span class="warehouse-notification-item-icon">
-                                        <i class="bi {{ $notification->type === \App\Models\WarehouseNotification::TYPE_OFFER ? 'bi-receipt-cutoff' : 'bi-shop' }}"></i>
+                                        <i class="bi {{ match ($notification->type) { \App\Models\WarehouseNotification::TYPE_OFFER => 'bi-receipt-cutoff', \App\Models\WarehouseNotification::TYPE_OFFER_NOTE => 'bi-chat-left-text', default => 'bi-shop' } }}"></i>
                                     </span>
                                     <span class="warehouse-notification-item-copy">
                                         <strong>{{ $notification->title }}</strong>
@@ -254,7 +254,7 @@
                                     </span>
                                 </a>
                             @empty
-                                <div class="warehouse-notification-empty">Keine neuen Lageraufträge.</div>
+                                <div class="warehouse-notification-empty">Keine neuen Lageraufträge oder Notizen.</div>
                             @endforelse
                         </div>
                     </div>

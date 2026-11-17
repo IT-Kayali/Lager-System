@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WarehouseNotification extends Model
 {
     public const TYPE_OFFER = 'offer';
+    public const TYPE_OFFER_NOTE = 'offer_note';
     public const TYPE_BRANCH_WITHDRAWAL = 'branch_withdrawal';
 
     protected $fillable = [

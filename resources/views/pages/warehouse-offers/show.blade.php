@@ -56,7 +56,7 @@
             </section>
         </div>
 
-        <aside class="premium-card warehouse-notes-sidebar">
+        <aside class="premium-card warehouse-notes-sidebar" id="warehouse-internal-notes">
             <div class="warehouse-notes-head"><div><h3>Interne Notizen</h3><div class="premium-muted">Für alle ERP-Mitarbeiter sichtbar</div></div><span class="premium-badge">{{ $offer->internalNotes->count() }}</span></div>
             <form method="POST" action="{{ route('offer-notes.store', $offer) }}" class="warehouse-note-form">@csrf
                 <label for="warehouse-internal-note">Notiz hinzufügen</label>
