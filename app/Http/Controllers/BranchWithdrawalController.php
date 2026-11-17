@@ -23,6 +23,13 @@ class BranchWithdrawalController extends Controller
         BranchWithdrawal::STATUS_ISSUED,
     ];
 
+    /** Abgeschlossene/stornierte Vorgänge bleiben im Lager lesbar, aber nicht bearbeitbar. */
+    private const WAREHOUSE_READABLE_STATUSES = [
+        BranchWithdrawal::STATUS_IN_PROGRESS,
+        BranchWithdrawal::STATUS_ISSUED,
+        BranchWithdrawal::STATUS_CANCELLED,
+    ];
+
     private function authorizeAccess(): void
     {
         abort_unless(auth()->check(), 403);
@@ -95,7 +102,7 @@ class BranchWithdrawalController extends Controller
             ->with(['items.product', 'user', 'processor'])
             ->when(
                 auth()->user()?->isWarehouse(),
-                fn ($query) => $query->whereIn('status', self::WAREHOUSE_VISIBLE_STATUSES)
+                fn ($query) => $query->whereIn('status', self::WAREHOUSE_READABLE_STATUSES)
             )
             ->when($search !== '', function ($query) use ($search, $searchField, $exact) {
                 $operator = $exact ? '=' : 'like';
@@ -128,6 +135,25 @@ class BranchWithdrawalController extends Controller
             'exact' => $exact,
             'selectedStatus' => $status,
             'selectedBranch' => $branch,
+        ]);
+    }
+
+    public function show(BranchWithdrawal $branchWithdrawal): View
+    {
+        $this->authorizeAccess();
+
+        if (auth()->user()?->isWarehouse()) {
+            abort_unless(
+                in_array($branchWithdrawal->status, self::WAREHOUSE_READABLE_STATUSES, true),
+                403,
+                'Dieser Filialausgang wurde noch nicht an das Lager übergeben.'
+            );
+        }
+
+        $branchWithdrawal->load(['items.product', 'user', 'processor']);
+
+        return view('pages.branch-withdrawals.show', [
+            'withdrawal' => $branchWithdrawal,
         ]);
     }
 
