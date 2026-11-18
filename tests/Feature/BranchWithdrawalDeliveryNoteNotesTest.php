@@ -127,6 +127,17 @@ it('keeps the existing PDF role access and streams notes for warehouse staff', f
     $this->actingAs($manager);
     $withdrawal = branchNotePdfWithdrawal('Nur für die interne Übergabe');
 
+    // Die PDF-Route benötigt eine gespeicherte Firmenvorlage (byKey/firstOrFail).
+    DocumentTemplate::query()->updateOrCreate(
+        ['key' => DocumentTemplate::WITH_COMPANY],
+        [
+            'name' => 'Mit Firmendaten & Logo',
+            'company_name' => 'Alowidat Test',
+            'show_company_details' => true,
+            'show_logo' => false,
+        ]
+    );
+
     $this->actingAs($warehouse)
         ->get(route('branch-withdrawals.delivery-note', $withdrawal))
         ->assertOk()
