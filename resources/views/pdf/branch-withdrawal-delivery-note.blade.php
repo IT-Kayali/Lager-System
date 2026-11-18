@@ -166,6 +166,29 @@
             text-align: center;
         }
 
+        /* Lagernotizen folgen der Artikeltabelle und werden vor dem Footer umgebrochen. */
+        .branch-note {
+            margin-top: 5mm;
+            font-size: 10pt;
+            color: #111;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+        }
+
+        .branch-note-title {
+            font-size: 10pt;
+            font-weight: 700;
+            margin-bottom: 2mm;
+        }
+
+        .branch-note-line {
+            font-size: 10pt;
+            line-height: 5.5mm;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+        }
+
         .ownership {
             position: absolute;
             left: 12mm;
@@ -232,35 +255,10 @@
         ];
     });
 
-    $firstPageLimit = 9;
-    $normalPageLimit = 18;
-    $lastPageLimit = 18;
-
-    $pages = collect();
-    $remaining = $items->values();
-
-    $pages->push([
-        'first' => true,
-        'items' => $remaining->take($firstPageLimit)->values(),
-    ]);
-
-    $remaining = $remaining->slice($firstPageLimit)->values();
-
-    while ($remaining->count() > $lastPageLimit) {
-        $pages->push([
-            'first' => false,
-            'items' => $remaining->take($normalPageLimit)->values(),
-        ]);
-
-        $remaining = $remaining->slice($normalPageLimit)->values();
-    }
-
-    if ($remaining->count() > 0) {
-        $pages->push([
-            'first' => false,
-            'items' => $remaining->values(),
-        ]);
-    }
+    $pages = \App\Support\BranchWithdrawalDeliveryNoteLayout::paginate(
+        $items,
+        (string) ($branchWithdrawal->note ?? '')
+    );
 
     $pageCount = $pages->count();
 @endphp
@@ -309,6 +307,7 @@
             @endif
 
             <div class="items-wrap {{ $page['first'] ? '' : 'continuation' }}">
+                @if ($page['items']->isNotEmpty())
                 <table class="items">
                     <thead>
                         <tr>
@@ -325,6 +324,18 @@
                         @endforeach
                     </tbody>
                 </table>
+                @endif
+
+                @if ($page['note_lines'] !== [])
+                    <div class="branch-note">
+                        <div class="branch-note-title">
+                            Lagernotiz{{ $page['note_continued'] ? ' (Fortsetzung)' : '' }}:
+                        </div>
+                        @foreach ($page['note_lines'] as $line)
+                            <div class="branch-note-line">@if ($line === '')&nbsp;@else{{ $line }}@endif</div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             @if ($loop->last)
