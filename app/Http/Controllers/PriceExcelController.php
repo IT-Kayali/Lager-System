@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductPriceTier;
 use App\Support\PriceExcelImportPlan;
 use App\Support\PriceExcelStreamWriter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -72,6 +73,17 @@ class PriceExcelController extends Controller
                         $rules = $mode === 'staffel'
                             ? ($tiers[$key] ?? collect())
                             : ($manualRules[$key] ?? collect());
+
+                        // Ohne vorhandene manuelle Regel eine ausfüllbare Standardzeile
+                        // anbieten. Sie wird nur bei ausdruecklicher Preisangabe erstellt.
+                        if ($mode === 'manuell' && $rules->isEmpty()) {
+                            $writer->append([
+                                $product->name, $group->name, 'manuell', '',
+                                1, null, $product->unitLabel('de'), null,
+                                'ab 1 ' . $product->unitLabel('de'),
+                                $product->id, $group->id, 0,
+                            ]);
+                        }
 
                         foreach ($rules as $rule) {
                             $writer->append([
@@ -165,6 +177,10 @@ class PriceExcelController extends Controller
         }
 
         $lines = array_values(array_unique(array_map('intval', $data['selected_rows'] ?? [])));
+        if (count($lines) > 100) {
+            return redirect()->route('prices.excel.import.form')
+                ->with('error', 'Für große Importe bitte die neue Importvorschau mit Paketverarbeitung verwenden.');
+        }
         try {
             $count = $service->apply($plan, $lines);
         } catch (ValidationException $exception) {
@@ -179,6 +195,123 @@ class PriceExcelController extends Controller
         Cache::forget($key);
 
         return redirect()->route('prices.index')->with('success', "Excel-Preisimport abgeschlossen: {$count} Preise aktualisiert.");
+    }
+
+    /**
+     * Startet den Import ohne Tausende POST-Checkboxen (max_input_vars).
+     * Im Formular werden nur die abgewählten Zeilen übertragen.
+     */
+    public function begin(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'preview_token' => ['required', 'string', 'size:48'],
+            'excluded_rows_csv' => ['nullable', 'string', 'max:400000', 'regex:/^\\d+(?:,\\d+)*$/D'],
+        ]);
+
+        $token = $data['preview_token'];
+
+        return Cache::lock($this->progressKey($token) . ':lock', 30)->block(10, function () use ($data, $token): JsonResponse {
+            $state = Cache::get($this->progressKey($token));
+            if (is_array($state)) {
+                return response()->json($this->progressData($state));
+            }
+
+            $plan = Cache::get($this->previewKey($token));
+            if (! is_array($plan)) {
+                return response()->json(['message' => 'Die Vorschau ist abgelaufen. Bitte die Excel-Datei erneut hochladen.'], 410);
+            }
+
+            $all = array_column($plan['rows'], 'line');
+            $excluded = trim((string) ($data['excluded_rows_csv'] ?? '')) === ''
+                ? []
+                : array_values(array_unique(array_map('intval', explode(',', $data['excluded_rows_csv']))));
+
+            if (array_diff($excluded, $all) !== []) {
+                return response()->json(['message' => 'Ungültige Zeilenauswahl. Bitte eine neue Vorschau erstellen.'], 422);
+            }
+
+            $lines = array_values(array_diff($all, $excluded));
+            if ($lines === []) {
+                return response()->json(['message' => 'Bitte mindestens einen Preis auswählen.'], 422);
+            }
+
+            $state = ['lines' => $lines, 'next' => 0, 'total' => count($lines)];
+            Cache::put($this->progressKey($token), $state, now()->addMinutes(60));
+
+            return response()->json($this->progressData($state));
+        });
+    }
+
+    /**
+     * Pro HTTP-Anfrage maximal 100 Preise. Nach einem Verbindungsabbruch
+     * kann der Browser ab dem zuletzt bestaetigten Paket fortfahren.
+     */
+    public function batch(Request $request, PriceExcelImportPlan $service): JsonResponse
+    {
+        $data = $request->validate([
+            'preview_token' => ['required', 'string', 'size:48'],
+        ]);
+
+        $token = $data['preview_token'];
+
+        return Cache::lock($this->progressKey($token) . ':lock', 30)->block(10, function () use ($token, $service): JsonResponse {
+            $state = Cache::get($this->progressKey($token));
+            if (! is_array($state)) {
+                return response()->json(['message' => 'Der Import wurde noch nicht gestartet oder ist abgelaufen.'], 410);
+            }
+
+            if ($state['next'] >= $state['total']) {
+                return response()->json($this->progressData($state));
+            }
+
+            $plan = Cache::get($this->previewKey($token));
+            if (! is_array($plan)) {
+                return response()->json(['message' => 'Die Importvorschau ist abgelaufen. Bisher übernommene Preise bleiben gespeichert.'], 410);
+            }
+
+            $lines = array_slice($state['lines'], $state['next'], 100);
+            try {
+                $service->apply($plan, $lines);
+            } catch (ValidationException $exception) {
+                return response()->json([
+                    'message' => $exception->validator->errors()->first('excel_file'),
+                    ...$this->progressData($state),
+                ], 422);
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                return response()->json([
+                    'message' => 'Fehler beim Speichern dieses Pakets. Vorherige Pakete bleiben gespeichert; bitte das Serverprotokoll prüfen.',
+                    ...$this->progressData($state),
+                ], 500);
+            }
+
+            $state['next'] += count($lines);
+            Cache::put($this->progressKey($token), $state, now()->addMinutes(60));
+
+            if ($state['next'] === $state['total']) {
+                Cache::forget($this->previewKey($token));
+                session()->flash('success', "Excel-Preisimport abgeschlossen: {$state['total']} Preise übernommen.");
+            } else {
+                Cache::put($this->previewKey($token), $plan, now()->addMinutes(30));
+            }
+
+            return response()->json($this->progressData($state));
+        });
+    }
+
+    private function progressData(array $state): array
+    {
+        return [
+            'processed' => $state['next'],
+            'total' => $state['total'],
+            'done' => $state['next'] >= $state['total'],
+        ];
+    }
+
+    private function progressKey(string $token): string
+    {
+        return $this->previewKey($token) . ':progress';
     }
 
     private function previewKey(string $token): string

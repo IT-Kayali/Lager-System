@@ -341,3 +341,204 @@ it('prueft auch einen ausgefuellten Gesamtpreisexport mit gebuendelten Datenbank
         @unlink($upload->getRealPath());
     }
 });
+
+
+it('exportiert Stückprodukte ohne vorhandene manuelle Regel und legt sie erst nach Bestätigung an', function () {
+    $group = erp11Group('Stückpreise');
+    $product = Product::query()->create(['name' => 'Karton Stück', 'unit' => 'piece', 'minimum_stock' => 0]);
+    $category = ProductCategory::query()->create(['name' => 'Stück ohne Staffel', 'price_tiers_enabled' => false]);
+    $product->categories()->attach($category->id);
+
+    $this->actingAs(erp11Manager());
+    $workbook = erp11Workbook($this, (string) $group->id);
+    $sheet = $workbook->getSheetByName('Preise');
+
+    expect($sheet->getHighestDataRow())->toBe(2)
+        ->and((string) $sheet->getCell('C2')->getValue())->toBe('manuell')
+        ->and((string) $sheet->getCell('G2')->getValue())->toBe('Stück')
+        ->and((int) $sheet->getCell('L2')->getValue())->toBe(0)
+        ->and($sheet->getCell('H2')->getValue())->toBeNull();
+
+    $sheet->setCellValue('H2', 3.12345);
+    $upload = erp11Upload($workbook);
+
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        expect($preview->viewData('preview')['rows'])->toHaveCount(1)
+            ->and($preview->viewData('preview')['rows'][0]['create'])->toBeTrue()
+            ->and(ManualPriceRule::query()->count())->toBe(0);
+
+        $this->postJson(route('prices.excel.import.begin'), [
+            'preview_token' => $preview->viewData('previewToken'),
+            'excluded_rows_csv' => '',
+        ])->assertOk()->assertJsonPath('total', 1);
+
+        $this->postJson(route('prices.excel.import.batch'), [
+            'preview_token' => $preview->viewData('previewToken'),
+        ])->assertOk()->assertJsonPath('done', true);
+
+        $rule = ManualPriceRule::query()->firstOrFail();
+        expect($rule->product_id)->toBe($product->id)
+            ->and($rule->customer_group_id)->toBe($group->id)
+            ->and((string) $rule->min_quantity)->toBe('1.000')
+            ->and($rule->max_quantity)->toBeNull()
+            ->and((string) $rule->price)->toBe('3.12345');
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('legt bei leerem Preis keine neue manuelle Regel an', function () {
+    $group = erp11Group('Stück leer');
+    $product = Product::query()->create(['name' => 'Stück ungeändert', 'unit' => 'piece', 'minimum_stock' => 0]);
+    $category = ProductCategory::query()->create(['name' => 'Stück ohne Preis', 'price_tiers_enabled' => false]);
+    $product->categories()->attach($category->id);
+
+    $this->actingAs(erp11Manager());
+    $workbook = erp11Workbook($this, (string) $group->id, true);
+    $upload = erp11Upload($workbook);
+
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        expect($preview->viewData('preview')['rows'])->toHaveCount(0)
+            ->and(ManualPriceRule::query()->count())->toBe(0);
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('übernimmt mehr als hundert Preise in einzelnen Paketen ohne Input-Limit', function () {
+    $group = erp11Group('Paketimport');
+    for ($i = 1; $i <= 21; $i++) {
+        erp11Product('Paketprodukt ' . $i);
+    }
+
+    $this->actingAs(erp11Manager());
+    $workbook = erp11Workbook($this, (string) $group->id, true);
+    $sheet = $workbook->getSheetByName('Preise');
+    $last = $sheet->getHighestDataRow();
+    expect($last)->toBeGreaterThan(102);
+
+    for ($line = 2; $line <= $last; $line++) {
+        $sheet->setCellValue('H' . $line, 7.00001);
+    }
+    $upload = erp11Upload($workbook);
+
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+        $total = count($preview->viewData('preview')['rows']);
+        expect($total)->toBe($last - 1);
+        $token = $preview->viewData('previewToken');
+
+        $this->postJson(route('prices.excel.import.begin'), [
+            'preview_token' => $token,
+            'excluded_rows_csv' => '2,3',
+        ])->assertOk()->assertJsonPath('total', $total - 2);
+
+        $this->postJson(route('prices.excel.import.batch'), [
+            'preview_token' => $token,
+        ])->assertOk()->assertJsonPath('processed', 100)->assertJsonPath('done', false);
+
+        // Erneutes Begin darf die schon gespeicherten Pakete nicht zurücksetzen.
+        $this->postJson(route('prices.excel.import.begin'), [
+            'preview_token' => $token,
+        ])->assertOk()->assertJsonPath('processed', 100);
+
+        $this->postJson(route('prices.excel.import.batch'), [
+            'preview_token' => $token,
+        ])->assertOk()->assertJsonPath('processed', $total - 2)->assertJsonPath('done', true);
+
+        expect(ProductPriceTier::query()->where('customer_group_id', $group->id)->where('price', '7.00001')->count())->toBe($total - 2)
+            ->and(ProductPriceTier::query()->where('customer_group_id', $group->id)->where('price', 0)->count())->toBe(2);
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('weist gefälschte Zeilenausschlüsse vor der Importbestätigung zurück', function () {
+    $group = erp11Group('Ungültige Auswahl');
+    erp11Product('Auswahlprodukt');
+
+    $this->actingAs(erp11Manager());
+    $workbook = erp11Workbook($this, (string) $group->id, true);
+    $workbook->getSheetByName('Preise')->setCellValue('H2', 9.0);
+    $upload = erp11Upload($workbook);
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload, 'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        $this->postJson(route('prices.excel.import.begin'), [
+            'preview_token' => $preview->viewData('previewToken'),
+            'excluded_rows_csv' => '99999',
+        ])->assertStatus(422);
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('verhindert die Anlage einer Stückregel bei Änderung nach der Vorschau', function () {
+    $group = erp11Group('Parallel Stück');
+    $product = Product::query()->create(['name' => 'Stück Parallel', 'unit' => 'piece', 'minimum_stock' => 0]);
+    $category = ProductCategory::query()->create(['name' => 'Stück manuell parallel', 'price_tiers_enabled' => false]);
+    $product->categories()->attach($category->id);
+
+    $this->actingAs(erp11Manager());
+    $workbook = erp11Workbook($this, (string) $group->id, true);
+    $workbook->getSheetByName('Preise')->setCellValue('H2', 9.0);
+    $upload = erp11Upload($workbook);
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload, 'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        ManualPriceRule::query()->create([
+            'product_id' => $product->id, 'customer_group_id' => $group->id,
+            'min_quantity' => 1, 'max_quantity' => null, 'price' => 4,
+        ]);
+
+        $this->postJson(route('prices.excel.import.begin'), [
+            'preview_token' => $preview->viewData('previewToken'),
+        ])->assertOk();
+        $this->postJson(route('prices.excel.import.batch'), [
+            'preview_token' => $preview->viewData('previewToken'),
+        ])->assertStatus(422);
+
+        expect(ManualPriceRule::query()->count())->toBe(1)
+            ->and((float) ManualPriceRule::query()->firstOrFail()->price)->toBe(4.0);
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('begrenzt die Auswahl auch bei 2000 Preiszeilen nicht auf max_input_vars', function () {
+    $user = erp11Manager();
+    $this->actingAs($user);
+
+    $token = \Illuminate\Support\Str::random(48);
+    $rows = array_map(fn (int $line) => ['line' => $line], range(2, 2002));
+    \Illuminate\Support\Facades\Cache::put(
+        'price-excel-import:' . $user->id . ':' . $token,
+        ['scope' => 'all', 'rows' => $rows],
+        now()->addMinutes(30)
+    );
+
+    $this->postJson(route('prices.excel.import.begin'), [
+        'preview_token' => $token,
+        'excluded_rows_csv' => '2,3',
+    ])->assertOk()
+        ->assertJsonPath('total', 1999)
+        ->assertJsonPath('processed', 0)
+        ->assertJsonPath('done', false);
+});

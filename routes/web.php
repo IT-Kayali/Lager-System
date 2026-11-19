@@ -112,6 +112,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/prices/excel/import', [PriceExcelController::class, 'importForm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.form');
     Route::post('/prices/excel/import', [PriceExcelController::class, 'import'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import');
     Route::post('/prices/excel/import/confirm', [PriceExcelController::class, 'confirm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.confirm');
+    Route::post('/prices/excel/import/begin', [PriceExcelController::class, 'begin'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.begin');
+    Route::post('/prices/excel/import/batch', [PriceExcelController::class, 'batch'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.batch');
     Route::get('/prices', [PriceController::class, 'index'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.index');
     Route::put('/prices', [PriceController::class, 'update'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.update');
 

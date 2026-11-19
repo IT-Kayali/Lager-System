@@ -99,8 +99,9 @@ class PriceExcelImportPlan
             $productId = filter_var($values['_product_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             $rowGroupId = filter_var($values['_group_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             $mode = trim((string) $values['pricing_mode']);
+            $createManualRule = $mode === 'manuell' && trim((string) $values['_price_id']) === '0';
 
-            if (! $id || ! $productId || ! $rowGroupId || ! in_array($mode, ['staffel', 'manuell'], true)) {
+            if ((! $id && ! $createManualRule) || ! $productId || ! $rowGroupId || ! in_array($mode, ['staffel', 'manuell'], true)) {
                 $this->reject("Zeile {$line}: Ungültige Zuordnung. Die ausgeblendeten IDs und die Preisart dürfen nicht verändert werden.");
             }
 
@@ -108,7 +109,9 @@ class PriceExcelImportPlan
                 $this->reject("Zeile {$line}: Diese Preiszeile gehört nicht zur ausgewählten Kundengruppe.");
             }
 
-            $uniqueKey = "{$mode}:{$id}";
+            $uniqueKey = $createManualRule
+                ? "manuell:new:{$productId}:{$rowGroupId}"
+                : "{$mode}:{$id}";
             if (isset($seen[$uniqueKey])) {
                 $this->reject("Zeile {$line}: Preisregel bereits in Zeile {$seen[$uniqueKey]} enthalten.");
             }
@@ -130,6 +133,46 @@ class PriceExcelImportPlan
                 $this->reject("Zeile {$line}: Der Preis muss zwischen 0 und 999999999 liegen und höchstens fünf Nachkommastellen haben.");
             }
             $newPrice = number_format((float) $priceText, 5, '.', '');
+
+            if ($createManualRule) {
+                $product = Product::query()->active()->with('categories')->find($productId);
+                $group = CustomerGroup::query()->find($rowGroupId);
+
+                if ($product === null || $group === null
+                    || $product->usesPriceTiers()
+                    || trim((string) $values['product']) !== $product->name
+                    || trim((string) $values['customer_group']) !== $group->name
+                    || trim((string) $values['unit']) !== $product->unitLabel('de')
+                    || trim((string) $values['tier_key']) !== ''
+                    || $this->rangeValue($values['quantity_from']) !== '1.000'
+                    || $this->rangeValue($values['quantity_to']) !== null
+                    || trim((string) $values['label']) !== 'ab 1 ' . $product->unitLabel('de')
+                    || ManualPriceRule::query()
+                        ->where('product_id', $productId)
+                        ->where('customer_group_id', $rowGroupId)
+                        ->exists()) {
+                    $this->reject("Zeile {$line}: Die neue manuelle Preisregel passt nicht mehr zur Datenbank. Bitte erneut exportieren.");
+                }
+
+                $rows[] = [
+                    'line' => $line,
+                    'id' => 0,
+                    'create' => true,
+                    'product_id' => $productId,
+                    'group_id' => $rowGroupId,
+                    'mode' => 'manuell',
+                    'product' => $product->name,
+                    'group' => $group->name,
+                    'label' => 'ab 1 ' . $product->unitLabel('de'),
+                    'tier_key' => '',
+                    'min' => '1.000',
+                    'max' => null,
+                    'old_price' => null,
+                    'new_price' => $newPrice,
+                ];
+
+                continue;
+            }
 
             $record = $recordCache[$mode]->get($id);
 
@@ -178,6 +221,58 @@ class PriceExcelImportPlan
             $scopeId = $this->groupId($plan['scope']);
 
             foreach ($changes as $row) {
+                // Neue Ein-Stueck-Regeln entstehen nur nach ausdruecklicher
+                // Bestaetigung und wenn noch keine manuelle Regel existiert.
+                if (! empty($row['create'])) {
+                    $product = Product::query()->active()->with('categories')
+                        ->lockForUpdate()->find($row['product_id']);
+                    $group = CustomerGroup::query()->find($row['group_id']);
+
+                    if ($product === null || $group === null
+                        || ($scopeId !== null && $scopeId !== $row['group_id'])
+                        || $product->usesPriceTiers()) {
+                        $this->reject("Zeile {$row['line']}: Produkt oder Kundengruppe wurde inzwischen geändert.");
+                    }
+
+                    $existing = ManualPriceRule::query()
+                        ->where('product_id', $row['product_id'])
+                        ->where('customer_group_id', $row['group_id'])
+                        ->get();
+                    if ($existing->isNotEmpty()) {
+                        // Bei verlorener Serverantwort kann das Paket bereits
+                        // angelegt worden sein. Exakt identische Regeln sind
+                        // ein sicherer Wiederholungsversuch, andere nicht.
+                        if ($existing->count() === 1
+                            && $this->rangeValue($existing->first()->min_quantity) === '1.000'
+                            && $existing->first()->max_quantity === null
+                            && $existing->first()->label === $row['label']
+                            && number_format((float) $existing->first()->price, 5, '.', '') === $row['new_price']) {
+                            continue;
+                        }
+
+                        $this->reject("Zeile {$row['line']}: Die manuelle Preisregel wurde inzwischen geändert. Bitte eine neue Vorschau erstellen.");
+                    }
+
+                    $record = ManualPriceRule::query()->create([
+                        'product_id' => $product->id,
+                        'customer_group_id' => $group->id,
+                        'min_quantity' => '1.000',
+                        'max_quantity' => null,
+                        'price' => $row['new_price'],
+                        'label' => $row['label'],
+                    ]);
+                    ActivityLog::record('price.excel_created', $record, [
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'customer_group' => $group->name,
+                        'mode' => 'manuell',
+                        'old_price' => null,
+                        'new_price' => $row['new_price'],
+                    ]);
+
+                    continue;
+                }
+
                 $record = ($row['mode'] === 'staffel' ? ProductPriceTier::query() : ManualPriceRule::query())
                     ->lockForUpdate()
                     ->find($row['id']);
@@ -186,7 +281,7 @@ class PriceExcelImportPlan
                     || (int) $record->product_id !== $row['product_id']
                     || (int) $record->customer_group_id !== $row['group_id']
                     || ($scopeId !== null && $scopeId !== $row['group_id'])
-                    || number_format((float) $record->price, 5, '.', '') !== $row['old_price']
+                    || ! in_array(number_format((float) $record->price, 5, '.', ''), [$row['old_price'], $row['new_price']], true)
                     || $this->rangeValue($row['mode'] === 'staffel' ? $record->min_grams : $record->min_quantity) !== $row['min']
                     || $this->rangeValue($row['mode'] === 'staffel' ? $record->max_grams : $record->max_quantity) !== $row['max']
                     || ($row['mode'] === 'staffel' && $record->tier_key !== $row['tier_key'])
@@ -199,6 +294,11 @@ class PriceExcelImportPlan
                 if ($product === null || $group === null
                     || $product->usesPriceTiers() !== ($row['mode'] === 'staffel')) {
                     $this->reject("Zeile {$row['line']}: Produkt, Preisart oder Kundengruppe hat sich geändert.");
+                }
+
+                if (number_format((float) $record->price, 5, '.', '') === $row['new_price']) {
+                    // Bereits uebernommenes Paket nach einem Netzabbruch.
+                    continue;
                 }
 
                 $record->update(['price' => $row['new_price']]);

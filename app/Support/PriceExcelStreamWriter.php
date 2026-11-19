@@ -180,7 +180,7 @@ XML);
             'Preisfelder unterstützen fünf Nachkommastellen (z. B. 0,12345).',
             'Leere Preise überspringen die Zeile, der Preis 0 wird übernommen.',
             'Für neue Kundengruppen und Preisstaffeln immer eine neue Vorlage herunterladen.',
-            'Manuelle Mengenregeln zuerst in der Preisverwaltung anlegen.',
+            'Fehlt fuer ein manuell bepreistes Produkt eine Regel, steht eine neue Zeile ab 1 Einheit bereit (Preis-ID 0).',
             'Import: Vorschau prüfen und gewünschte Zeilen bestätigen. Es wird nichts gelöscht.',
         ] as $i => $line) {
             $row = $i + 1;
