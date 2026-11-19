@@ -22,7 +22,7 @@ class ManualPriceRule extends Model
         return [
             'min_quantity' => 'decimal:3',
             'max_quantity' => 'decimal:3',
-            'price' => 'decimal:2',
+            'price' => 'decimal:5',
         ];
     }
 
