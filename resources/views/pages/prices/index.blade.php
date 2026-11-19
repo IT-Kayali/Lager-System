@@ -15,6 +15,29 @@
     @endif
 
     <section class="premium-card erp-list-card">
+        <h3>Excel: Preise nach Kundengruppe</h3>
+        <p class="premium-muted">Preise für eine Kundengruppe oder alle Gruppen exportieren und importieren. Die Vorlagen berücksichtigen auch neu angelegte Kundengruppen und Preisstaffeln.</p>
+        <form method="GET" class="premium-toolbar erp-list-filter-form">
+            <label for="price-excel-group">Preisgruppe</label>
+            <select id="price-excel-group" name="customer_group_id" class="premium-select erp-list-select">
+                <option value="all">Alle Kundengruppen</option>
+                @foreach ($groups as $group)
+                    <option value="{{ $group->id }}" @selected($selectedGroup?->id === $group->id)>{{ $group->name }}</option>
+                @endforeach
+            </select>
+            <button type="submit" formaction="{{ route('prices.excel.template') }}" class="premium-btn">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Importvorlage herunterladen
+            </button>
+            <button type="submit" formaction="{{ route('prices.excel.export') }}" class="premium-btn">
+                <i class="bi bi-download"></i> Preise exportieren
+            </button>
+            <a class="premium-btn gold" href="{{ route('prices.excel.import.form') }}">
+                <i class="bi bi-upload"></i> Preise importieren
+            </a>
+        </form>
+    </section>
+
+    <section class="premium-card erp-list-card">
         <div class="erp-list-filter-card" data-csp-style="s-75c7460b">
         <form method="GET" action="{{ route('prices.index') }}" class="premium-toolbar erp-list-filter-form">
             <select name="product_id" class="premium-select erp-list-select" data-auto-submit>
