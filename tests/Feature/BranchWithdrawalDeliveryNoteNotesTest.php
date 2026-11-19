@@ -108,6 +108,31 @@ it('splits long notes across pages without consuming the ownership or footer are
         ->toBeGreaterThan(1);
 });
 
+it('reserves enough height for wide glyphs in notes and item rows', function () {
+    $pages = BranchWithdrawalDeliveryNoteLayout::paginate(
+        collect([(object) [
+            'description' => str_repeat('W', 70),
+            'quantity' => str_repeat('W', 26),
+        ]]),
+        str_repeat('W', 76)
+    );
+
+    expect($pages)->toHaveCount(1);
+
+    $page = $pages->first();
+
+    // 76 breite W werden vor der PDF-Darstellung auf mehrere Zeilen verteilt.
+    expect($page['note_lines'])->toHaveCount(2);
+
+    foreach ($page['note_lines'] as $line) {
+        expect(mb_strwidth($line, 'UTF-8'))->toBeLessThanOrEqual(40);
+    }
+
+    // Drei Zeilen Artikelbezeichnung plus Tabellenkopf und zwei Notizzeilen.
+    expect($page['used_mm'])->toBeGreaterThanOrEqual(49.5)
+        ->and($page['used_mm'])->toBeLessThanOrEqual($page['available_mm']);
+});
+
 it('keeps a short warehouse note on the first page with a single product', function () {
     $pages = BranchWithdrawalDeliveryNoteLayout::paginate(
         collect([(object) ['description' => 'Produkt', 'quantity' => '2,5 gram']]),
