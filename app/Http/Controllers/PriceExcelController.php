@@ -7,16 +7,14 @@ use App\Models\ManualPriceRule;
 use App\Models\Product;
 use App\Models\ProductPriceTier;
 use App\Support\PriceExcelImportPlan;
+use App\Support\PriceExcelStreamWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PriceExcelController extends Controller
@@ -35,86 +33,68 @@ class PriceExcelController extends Controller
     {
         $scope = (string) $request->query('customer_group_id', 'all');
         $groupId = $service->groupId($scope);
-        $groups = CustomerGroup::query()->when($groupId !== null, fn ($q) => $q->whereKey($groupId))->ordered()->get();
-        $products = Product::query()->active()->with('categories')->orderBy('name')->get();
+        $groups = CustomerGroup::query()
+            ->when($groupId !== null, fn ($query) => $query->whereKey($groupId))
+            ->ordered()
+            ->get();
 
-        $tierRecords = ProductPriceTier::query()
-            ->whereIn('product_id', $products->pluck('id'))
-            ->whereIn('customer_group_id', $groups->pluck('id'))
-            ->orderBy('min_grams')->get()->groupBy(fn ($r) => $r->product_id . ':' . $r->customer_group_id);
-        $manualRecords = ManualPriceRule::query()
-            ->whereIn('product_id', $products->pluck('id'))
-            ->whereIn('customer_group_id', $groups->pluck('id'))
-            ->orderBy('min_quantity')->get()->groupBy(fn ($r) => $r->product_id . ':' . $r->customer_group_id);
+        // Maximal 50 Produkte sowie deren aktuelle Preise gleichzeitig laden.
+        // Der XLSX-Schreiber schreibt XML auf die Festplatte statt alle Zellen
+        // als PhpSpreadsheet-Objekte im Arbeitsspeicher zu halten.
+        $writer = new PriceExcelStreamWriter();
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Preise');
-        $sheet->fromArray([PriceExcelImportPlan::HEADERS]);
-        $row = 2;
+        Product::query()
+            ->active()
+            ->with('categories')
+            ->chunkById(50, function ($products) use ($groups, $template, $writer): void {
+                $productIds = $products->pluck('id');
+                $groupIds = $groups->pluck('id');
 
-        foreach ($products as $product) {
-            $mode = $product->usesPriceTiers() ? 'staffel' : 'manuell';
-            foreach ($groups as $group) {
-                $key = $product->id . ':' . $group->id;
-                $rules = $mode === 'staffel' ? ($tierRecords[$key] ?? collect()) : ($manualRecords[$key] ?? collect());
-                foreach ($rules as $rule) {
-                    $sheet->fromArray([[
-                        $product->name,
-                        $group->name,
-                        $mode,
-                        $mode === 'staffel' ? $rule->tier_key : '',
-                        $mode === 'staffel' ? $rule->min_grams : (float) $rule->min_quantity,
-                        $mode === 'staffel' ? $rule->max_grams : ($rule->max_quantity !== null ? (float) $rule->max_quantity : null),
-                        $product->unitLabel('de'),
-                        $template ? null : (float) $rule->price,
-                        $mode === 'staffel' ? $rule->tier_label : $rule->label,
-                        $product->id,
-                        $group->id,
-                        $rule->id,
-                    ]], null, 'A' . $row);
-                    // Frei gepflegte Namen/Beschreibungen nie als Excel-Formel ausgeben.
-                    $sheet->setCellValueExplicit('A' . $row, (string) $product->name, DataType::TYPE_STRING);
-                    $sheet->setCellValueExplicit('B' . $row, (string) $group->name, DataType::TYPE_STRING);
-                    $sheet->setCellValueExplicit('I' . $row, (string) ($mode === 'staffel' ? $rule->tier_label : $rule->label), DataType::TYPE_STRING);
-                    $row++;
+                $tiers = ProductPriceTier::query()
+                    ->whereIn('product_id', $productIds)
+                    ->whereIn('customer_group_id', $groupIds)
+                    ->orderBy('min_grams')
+                    ->get()
+                    ->groupBy(fn ($rule) => $rule->product_id . ':' . $rule->customer_group_id);
+
+                $manualRules = ManualPriceRule::query()
+                    ->whereIn('product_id', $productIds)
+                    ->whereIn('customer_group_id', $groupIds)
+                    ->orderBy('min_quantity')
+                    ->get()
+                    ->groupBy(fn ($rule) => $rule->product_id . ':' . $rule->customer_group_id);
+
+                foreach ($products as $product) {
+                    $mode = $product->usesPriceTiers() ? 'staffel' : 'manuell';
+
+                    foreach ($groups as $group) {
+                        $key = $product->id . ':' . $group->id;
+                        $rules = $mode === 'staffel'
+                            ? ($tiers[$key] ?? collect())
+                            : ($manualRules[$key] ?? collect());
+
+                        foreach ($rules as $rule) {
+                            $writer->append([
+                                $product->name,
+                                $group->name,
+                                $mode,
+                                $mode === 'staffel' ? $rule->tier_key : '',
+                                $mode === 'staffel' ? $rule->min_grams : (float) $rule->min_quantity,
+                                $mode === 'staffel' ? $rule->max_grams : ($rule->max_quantity !== null ? (float) $rule->max_quantity : null),
+                                $product->unitLabel('de'),
+                                $template ? null : number_format((float) $rule->price, 5, '.', ''),
+                                $mode === 'staffel' ? $rule->tier_label : $rule->label,
+                                $product->id,
+                                $group->id,
+                                $rule->id,
+                            ]);
+                        }
+                    }
                 }
-            }
-        }
-
-        $sheet->getStyle('A1:L1')->getFont()->setBold(true);
-        $sheet->freezePane('D2');
-        $sheet->setAutoFilter('A1:I' . max(1, $row - 1));
-        foreach (range('A', 'I') as $column) {
-            $sheet->getColumnDimension($column)->setAutoSize(true);
-        }
-        foreach (range('J', 'L') as $column) {
-            $sheet->getColumnDimension($column)->setVisible(false);
-        }
-        if ($row > 2) {
-            $sheet->getStyle('E2:F' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.000');
-            $sheet->getStyle('H2:H' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-        }
-
-        $help = $spreadsheet->createSheet();
-        $help->setTitle('Anleitung');
-        $help->fromArray([
-            ['Preis-Excel: Anleitung'],
-            ['Nur Spalte H (price) bearbeiten. Alle anderen Spalten und die versteckten IDs unverändert lassen.'],
-            ['Eine leere Preiszelle überspringt die Zeile; der Preis 0 wird übernommen.'],
-            ['Für eine neue Kundengruppe oder neue Preisstaffeln bitte immer eine frische Vorlage herunterladen.'],
-            ['Manuelle Mengenregeln zuerst im Preisbereich anlegen; Excel aktualisiert vorhandene Preisregeln.'],
-            ['Import: erst Vorschau prüfen, dann gewünschte Zeilen bestätigen. Keine Zeilen werden gelöscht.'],
-        ]);
-        $help->getColumnDimension('A')->setWidth(105);
-        $spreadsheet->setActiveSheetIndex(0);
+            });
 
         $path = storage_path('app/preise-' . Str::uuid() . '.xlsx');
-        try {
-            (new Xlsx($spreadsheet))->save($path);
-        } finally {
-            $spreadsheet->disconnectWorksheets();
-        }
+        $writer->finish($path);
 
         $suffix = $groupId === null ? 'alle-gruppen' : 'gruppe-' . $groupId;
         $name = $template ? 'preisvorlage-' : 'preise-';
