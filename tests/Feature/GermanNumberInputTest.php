@@ -35,8 +35,10 @@ it('keeps German number handling scoped and preserves quantity precision', funct
 
     expect($script)
         ->toContain("new Intl.NumberFormat('de-DE'")
-        ->toContain('minimumFractionDigits: 2')
-        ->toContain('isQuantityField(input) ? 3 : 2')
+        ->toContain('minimumFractionDigits,')
+        ->toContain('const maximumFractionDigits = isPrice ? 5 : (isQuantityField(input) ? 3 : 2)')
+        ->toContain('isPrice ? 5 : 2')
+        ->toContain('input[name^="rules["][name$="[price]"]')
         ->toContain("input.inputMode = 'decimal'")
         ->toContain("input.type === 'hidden'")
         ->not->toContain('window.parseFloat =')
