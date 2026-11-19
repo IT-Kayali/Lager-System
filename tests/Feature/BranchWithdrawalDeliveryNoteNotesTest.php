@@ -80,7 +80,7 @@ it('renders Arabic warehouse notes as joined right-aligned glyphs and preserves 
     $manager = User::factory()->create(['role' => User::ROLE_MANAGER, 'is_active' => true]);
     $this->actingAs($manager);
 
-    $withdrawal = branchNotePdfWithdrawal("Bitte vorsichtig behandeln.\\nيرجى تسليم البضاعة إلى الفرع رقم 6");
+    $withdrawal = branchNotePdfWithdrawal("Bitte vorsichtig behandeln.\nيرجى تسليم البضاعة إلى الفرع رقم 6");
     $html = branchNotePdfHtml($withdrawal);
 
     expect($html)
@@ -89,7 +89,7 @@ it('renders Arabic warehouse notes as joined right-aligned glyphs and preserves 
         ->toContain('font-family: DejaVu Sans, sans-serif;')
         ->not->toContain('يرجى تسليم البضاعة');
 
-    expect(preg_match('/[\\x{FB50}-\\x{FEFF}]/u', $html))->toBe(1);
+    expect(preg_match('/[\x{FB50}-\x{FEFF}]/u', $html))->toBe(1);
 
     $this->get(route('branch-withdrawals.delivery-note', $withdrawal))
         ->assertOk()
