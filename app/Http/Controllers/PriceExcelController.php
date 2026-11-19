@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -72,6 +73,10 @@ class PriceExcelController extends Controller
                         $group->id,
                         $rule->id,
                     ]], null, 'A' . $row);
+                    // Frei gepflegte Namen/Beschreibungen nie als Excel-Formel ausgeben.
+                    $sheet->setCellValueExplicit('A' . $row, (string) $product->name, DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit('B' . $row, (string) $group->name, DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit('I' . $row, (string) ($mode === 'staffel' ? $rule->tier_label : $rule->label), DataType::TYPE_STRING);
                     $row++;
                 }
             }
