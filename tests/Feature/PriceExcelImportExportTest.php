@@ -250,7 +250,7 @@ it('exportiert und importiert Staffelpreise mit fünf Nachkommastellen', functio
     expect((float) $sheet->getCell('H2')->getValue())->toBe(0.12345)
         ->and($sheet->getStyle('H2')->getNumberFormat()->getFormatCode())->toBe('0.00000');
 
-    $sheet->setCellValue('H2', 0.54321);
+    $sheet->setCellValue('H2', 0.00001);
     $upload = erp11Upload($spreadsheet);
     try {
         $preview = $this->post(route('prices.excel.import'), [
@@ -263,7 +263,7 @@ it('exportiert und importiert Staffelpreise mit fünf Nachkommastellen', functio
             'selected_rows' => [2],
         ])->assertRedirect(route('prices.index'));
 
-        expect((string) $tier->fresh()->price)->toBe('0.54321');
+        expect((string) $tier->fresh()->price)->toBe('0.00001');
     } finally {
         @unlink($upload->getRealPath());
     }
