@@ -79,10 +79,10 @@ class PriceExcelImportPlan
 
             $priceValue = GermanNumber::parse($values['price']);
             $priceText = trim((string) $priceValue);
-            if (! preg_match('/^(?:0|[1-9]\d{0,8})(?:\.\d{1,2})?$/D', $priceText)) {
-                $this->reject("Zeile {$line}: Der Preis muss zwischen 0 und 999999999 liegen und höchstens zwei Nachkommastellen haben.");
+            if (! preg_match('/^(?:0|[1-9]\d{0,8})(?:\.\d{1,5})?$/D', $priceText)) {
+                $this->reject("Zeile {$line}: Der Preis muss zwischen 0 und 999999999 liegen und höchstens fünf Nachkommastellen haben.");
             }
-            $newPrice = number_format((float) $priceText, 2, '.', '');
+            $newPrice = number_format((float) $priceText, 5, '.', '');
 
             $record = ($mode === 'staffel' ? ProductPriceTier::query() : ManualPriceRule::query())
                 ->with(['product.categories', 'customerGroup'])
@@ -93,7 +93,7 @@ class PriceExcelImportPlan
             }
 
             $this->verifyIdentity($record, $values, $mode, $productId, $rowGroupId, $line);
-            $oldPrice = number_format((float) $record->price, 2, '.', '');
+            $oldPrice = number_format((float) $record->price, 5, '.', '');
 
             if ($oldPrice === $newPrice) {
                 continue;
@@ -141,7 +141,7 @@ class PriceExcelImportPlan
                     || (int) $record->product_id !== $row['product_id']
                     || (int) $record->customer_group_id !== $row['group_id']
                     || ($scopeId !== null && $scopeId !== $row['group_id'])
-                    || number_format((float) $record->price, 2, '.', '') !== $row['old_price']
+                    || number_format((float) $record->price, 5, '.', '') !== $row['old_price']
                     || $this->rangeValue($row['mode'] === 'staffel' ? $record->min_grams : $record->min_quantity) !== $row['min']
                     || $this->rangeValue($row['mode'] === 'staffel' ? $record->max_grams : $record->max_quantity) !== $row['max']
                     || ($row['mode'] === 'staffel' && $record->tier_key !== $row['tier_key'])
