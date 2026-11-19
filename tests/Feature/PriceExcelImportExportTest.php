@@ -542,3 +542,102 @@ it('begrenzt die Auswahl auch bei 2000 Preiszeilen nicht auf max_input_vars', fu
         ->assertJsonPath('processed', 0)
         ->assertJsonPath('done', false);
 });
+
+it('zeigt Staffelpreise im Formular mit deutschem Komma und allen fünf Dezimalstellen', function () {
+    $group = erp11Group('Anzeige fünf Stellen');
+    $product = erp11Product('Anzeige Staffel');
+    $tier = ProductPriceTier::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->orderBy('min_grams')
+        ->firstOrFail();
+
+    $tier->update(['price' => '12.34567']);
+
+    $this->actingAs(erp11Manager())
+        ->get(route('prices.index', [
+            'product_id' => $product->id,
+            'customer_group_id' => $group->id,
+        ]))
+        ->assertOk()
+        ->assertSee('value="12,34567"', false)
+        ->assertSee('inputmode="decimal"', false);
+});
+
+it('speichert deutsche Preisangaben mit fünf Dezimalstellen im Staffelbereich', function () {
+    $group = erp11Group('Deutsche Staffel');
+    $product = erp11Product('Kommapreis');
+    $tier = ProductPriceTier::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->orderBy('min_grams')
+        ->firstOrFail();
+
+    $this->actingAs(erp11Manager())
+        ->put(route('prices.update'), [
+            'product_id' => $product->id,
+            'customer_group_id' => $group->id,
+            'prices' => [$tier->id => '12,34567'],
+        ])
+        ->assertRedirect();
+
+    expect((string) $tier->fresh()->price)->toBe('12.34567');
+
+    $this->put(route('prices.update'), [
+        'product_id' => $product->id,
+        'customer_group_id' => $group->id,
+        'prices' => [$tier->id => '12,345678'],
+    ])->assertSessionHasErrors('prices.' . $tier->id);
+
+    expect((string) $tier->fresh()->price)->toBe('12.34567');
+});
+
+it('zeigt und speichert manuelle Stückpreise mit fünf Dezimalstellen', function () {
+    $group = erp11Group('Deutsche Stückpreise');
+    $product = Product::query()->create([
+        'name' => 'Fünfstelliger Stückpreis',
+        'unit' => 'piece',
+        'minimum_stock' => 0,
+    ]);
+    $category = ProductCategory::query()->create([
+        'name' => 'Fünfstellige manuelle Preise',
+        'price_tiers_enabled' => false,
+    ]);
+    $product->categories()->attach($category->id);
+
+    $rule = ManualPriceRule::query()->create([
+        'product_id' => $product->id,
+        'customer_group_id' => $group->id,
+        'min_quantity' => 1,
+        'max_quantity' => null,
+        'price' => '3.00001',
+    ]);
+
+    $this->actingAs(erp11Manager())
+        ->get(route('prices.index', [
+            'product_id' => $product->id,
+            'customer_group_id' => $group->id,
+        ]))
+        ->assertOk()
+        ->assertSee('value="3,00001"', false);
+
+    $this->put(route('prices.update'), [
+        'product_id' => $product->id,
+        'customer_group_id' => $group->id,
+        'rules' => [[
+            'min_quantity' => '1',
+            'max_quantity' => '',
+            'price' => '17,34567',
+            'label' => '',
+        ]],
+    ])->assertRedirect();
+
+    expect(ManualPriceRule::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->count())->toBe(1);
+    expect((string) ManualPriceRule::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->firstOrFail()->price)->toBe('17.34567');
+});
