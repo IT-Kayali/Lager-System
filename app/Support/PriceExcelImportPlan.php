@@ -78,7 +78,17 @@ class PriceExcelImportPlan
             $seen[$uniqueKey] = $line;
 
             $priceValue = GermanNumber::parse($values['price']);
-            $priceText = trim((string) $priceValue);
+            // Excel speichert sehr kleine Zahlen oft als 1.0E-5. Diese dürfen
+            // nicht versehentlich als ungültige Preise verworfen werden.
+            if (is_int($priceValue) || is_float($priceValue)) {
+                $rounded = round((float) $priceValue, 5);
+                if (! is_finite((float) $priceValue) || abs((float) $priceValue - $rounded) > 0.00000001) {
+                    $this->reject("Zeile {$line}: Es sind maximal fünf Nachkommastellen erlaubt.");
+                }
+                $priceText = number_format($rounded, 5, '.', '');
+            } else {
+                $priceText = trim((string) $priceValue);
+            }
             if (! preg_match('/^(?:0|[1-9]\d{0,8})(?:\.\d{1,5})?$/D', $priceText)) {
                 $this->reject("Zeile {$line}: Der Preis muss zwischen 0 und 999999999 liegen und höchstens fünf Nachkommastellen haben.");
             }
