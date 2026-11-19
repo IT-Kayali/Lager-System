@@ -68,8 +68,8 @@
                                         <td>{{ $row['product'] }}</td>
                                         <td>{{ $row['group'] }}</td>
                                         <td>{{ $row['label'] }} ({{ $row['mode'] }})</td>
-                                        <td>{{ \App\Support\GermanNumber::format($row['old_price']) }} €</td>
-                                        <td><strong>{{ \App\Support\GermanNumber::format($row['new_price']) }} €</strong></td>
+                                        <td>{{ \App\Support\GermanNumber::format($row['old_price'], 5) }} €</td>
+                                        <td><strong>{{ \App\Support\GermanNumber::format($row['new_price'], 5) }} €</strong></td>
                                     </tr>
                                 @endforeach
                             </tbody>
