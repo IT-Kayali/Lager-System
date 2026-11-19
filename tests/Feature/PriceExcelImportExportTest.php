@@ -206,7 +206,7 @@ it('aktualisiert vorhandene manuelle Mengenpreise ohne Regeln zu löschen', func
     $workbook = erp11Workbook($this, (string) $group->id, true);
     $sheet = $workbook->getSheetByName('Preise');
     expect($sheet->getCell('C2')->getValue())->toBe('manuell');
-    $sheet->setCellValue('H2', 8.5);
+    $sheet->setCellValue('H2', 8.12345);
     $upload = erp11Upload($workbook);
 
     try {
@@ -217,7 +217,7 @@ it('aktualisiert vorhandene manuelle Mengenpreise ohne Regeln zu löschen', func
             'preview_token' => $preview->viewData('previewToken'), 'selected_rows' => [2],
         ])->assertRedirect(route('prices.index'));
 
-        expect((float) $manual->fresh()->price)->toBe(8.5)
+        expect((float) $manual->fresh()->price)->toBe(8.12345)
             ->and(ManualPriceRule::query()->where('product_id', $product->id)->count())->toBe(1);
     } finally {
         @unlink($upload->getRealPath());
@@ -230,4 +230,77 @@ it('verhindert Preisexport und -import für Lagerrollen', function () {
     $this->get(route('prices.excel.template'))->assertForbidden();
     $this->get(route('prices.excel.import.form'))->assertForbidden();
     $this->post(route('prices.excel.import'), [])->assertForbidden();
+});
+
+
+it('exportiert und importiert Staffelpreise mit fünf Nachkommastellen', function () {
+    $group = erp11Group('Präzision');
+    $product = erp11Product('Fünf Stellen');
+    $tier = ProductPriceTier::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->orderBy('min_grams')
+        ->firstOrFail();
+    $tier->update(['price' => '0.12345']);
+
+    $this->actingAs(erp11Manager());
+    $spreadsheet = erp11Workbook($this, (string) $group->id);
+    $sheet = $spreadsheet->getSheetByName('Preise');
+
+    expect((float) $sheet->getCell('H2')->getValue())->toBe(0.12345)
+        ->and($sheet->getStyle('H2')->getNumberFormat()->getFormatCode())->toBe('0.00000');
+
+    $sheet->setCellValue('H2', 0.54321);
+    $upload = erp11Upload($spreadsheet);
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        $this->post(route('prices.excel.import.confirm'), [
+            'preview_token' => $preview->viewData('previewToken'),
+            'selected_rows' => [2],
+        ])->assertRedirect(route('prices.index'));
+
+        expect((string) $tier->fresh()->price)->toBe('0.54321');
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('erzeugt auch für viele Produkte und mehrere Gruppen einen vollständigen XLSX-Export', function () {
+    erp11Group('Großexport A');
+    erp11Group('Großexport B');
+
+    for ($i = 1; $i <= 100; $i++) {
+        erp11Product('Großexport Produkt ' . $i);
+    }
+
+    $this->actingAs(erp11Manager());
+    $spreadsheet = erp11Workbook($this);
+    $sheet = $spreadsheet->getSheetByName('Preise');
+
+    expect($sheet->getHighestDataRow())->toBeGreaterThanOrEqual(1000)
+        ->and($spreadsheet->getSheetByName('Anleitung'))->not->toBeNull();
+
+    $spreadsheet->disconnectWorksheets();
+});
+
+it('speichert fünfstellige Preise auch über die normale Preisverwaltung', function () {
+    $group = erp11Group('Direkte Eingabe');
+    $product = erp11Product('Fünf Dezimalstellen');
+    $tier = ProductPriceTier::query()
+        ->where('product_id', $product->id)
+        ->where('customer_group_id', $group->id)
+        ->orderBy('min_grams')->firstOrFail();
+
+    $this->actingAs(erp11Manager())
+        ->put(route('prices.update'), [
+            'product_id' => $product->id,
+            'customer_group_id' => $group->id,
+            'prices' => [$tier->id => '12.34567'],
+        ])->assertRedirect();
+
+    expect((string) $tier->fresh()->price)->toBe('12.34567');
 });
