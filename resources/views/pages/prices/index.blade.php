@@ -121,12 +121,12 @@
                                         <td>
                                             <input
                                                 name="prices[{{ $tier->id }}]"
-                                                type="number"
-                                                step="0.00001"
-                                                min="0"
+                                                type="text"
+                                                inputmode="decimal"
+                                                autocomplete="off"
                                                 class="premium-input"
                                                 data-csp-style="s-74d516ba"
-                                                value="{{ old('prices.' . $tier->id, $tier->price) }}"
+                                                value="{{ old('prices.' . $tier->id, \App\Support\GermanNumber::format($tier->price, 5)) }}"
                                             >
                                         </td>
                                     </tr>
@@ -142,7 +142,7 @@
                             : $manualRules->map(fn ($rule) => [
                                 'min_quantity' => \App\Support\GermanNumber::input($rule->min_quantity),
                                 'max_quantity' => $rule->max_quantity !== null ? \App\Support\GermanNumber::input($rule->max_quantity) : '',
-                                'price' => $rule->price,
+                                'price' => \App\Support\GermanNumber::format($rule->price, 5),
                                 'label' => $rule->label,
                             ]);
 
@@ -185,7 +185,7 @@
                                         <td><input name="rules[{{ $index }}][min_quantity]" type="number" step="0.001" min="0.001" class="premium-input" value="{{ $rule['min_quantity'] ?? '' }}" required></td>
                                         <td><input name="rules[{{ $index }}][max_quantity]" type="number" step="0.001" min="0.001" class="premium-input" value="{{ $rule['max_quantity'] ?? '' }}" placeholder="unbegrenzt"></td>
                                         <td><strong>{{ $selectedProduct->unitLabel('de') }}</strong></td>
-                                        <td><input name="rules[{{ $index }}][price]" type="number" step="0.00001" min="0" class="premium-input" value="{{ $rule['price'] ?? '' }}" required></td>
+                                        <td><input name="rules[{{ $index }}][price]" type="text" inputmode="decimal" autocomplete="off" class="premium-input" value="{{ $rule['price'] ?? '' }}" required></td>
                                         <td><input name="rules[{{ $index }}][label]" class="premium-input" maxlength="100" value="{{ $rule['label'] ?? '' }}" placeholder="z. B. Kartonpreis"></td>
                                         <td><button type="button" class="premium-icon-btn premium-danger remove-price-rule" title="Regel entfernen"><i class="bi bi-trash"></i></button></td>
                                     </tr>
@@ -199,7 +199,7 @@
                             <td><input data-name="min_quantity" type="number" step="0.001" min="0.001" class="premium-input" required></td>
                             <td><input data-name="max_quantity" type="number" step="0.001" min="0.001" class="premium-input" placeholder="unbegrenzt"></td>
                             <td><strong>{{ $selectedProduct->unitLabel('de') }}</strong></td>
-                            <td><input data-name="price" type="number" step="0.00001" min="0" class="premium-input" required></td>
+                            <td><input data-name="price" type="text" inputmode="decimal" autocomplete="off" class="premium-input" required></td>
                             <td><input data-name="label" class="premium-input" maxlength="100" placeholder="z. B. Kartonpreis"></td>
                             <td><button type="button" class="premium-icon-btn premium-danger remove-price-rule" title="Regel entfernen"><i class="bi bi-trash"></i></button></td>
                         </tr>

@@ -7,6 +7,7 @@ use App\Models\CustomerGroup;
 use App\Models\ManualPriceRule;
 use App\Models\Product;
 use App\Models\ProductPriceTier;
+use App\Support\GermanNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +87,18 @@ class PriceController extends Controller
 
     private function updateTierPrices(Request $request, Product $product, CustomerGroup $group): RedirectResponse
     {
+        // Textfelder zeigen die Preise immer mit deutschem Komma und exakt
+        // fuenf Nachkommastellen. Die Validierung erhaelt Dezimalpunkte.
+        $prices = $request->input('prices', []);
+        if (is_array($prices)) {
+            foreach ($prices as $tierId => $price) {
+                if (is_string($price)) {
+                    $prices[$tierId] = GermanNumber::parse($price);
+                }
+            }
+            $request->merge(['prices' => $prices]);
+        }
+
         $data = $request->validate([
             'prices' => ['required', 'array'],
             'prices.*' => ['required', 'numeric', 'decimal:0,5', 'min:0', 'max:999999999'],
@@ -137,6 +150,13 @@ class PriceController extends Controller
                 || filled($rule['price'] ?? null)
                 || filled($rule['label'] ?? null)
             )
+            ->map(function (array $rule): array {
+                if (isset($rule['price']) && is_string($rule['price'])) {
+                    $rule['price'] = GermanNumber::parse($rule['price']);
+                }
+
+                return $rule;
+            })
             ->values()
             ->all();
 
