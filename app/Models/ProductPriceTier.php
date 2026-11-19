@@ -50,7 +50,7 @@ class ProductPriceTier extends Model
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:2',
+            'price' => 'decimal:5',
             'min_grams' => 'integer',
             'max_grams' => 'integer',
         ];
