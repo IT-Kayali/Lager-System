@@ -57,7 +57,7 @@ it('erzeugt dynamische Excel-Vorlagen für neue Kundengruppen und alle Gruppen',
     $single = erp11Workbook($this, (string) $alpha->id, true);
     $singleSheet = $single->getSheetByName('Preise');
     expect($singleSheet->getHighestDataRow())->toBeGreaterThan(1)
-        ->and($singleSheet->getCell('B2')->getValue())->toBe($alpha->name)
+        ->and((string) $singleSheet->getCell('B2')->getValue())->toBe($alpha->name)
         ->and($singleSheet->getCell('H2')->getValue())->toBeNull()
         ->and((int) $singleSheet->getCell('J2')->getValue())->toBe($product->id)
         ->and((int) $singleSheet->getCell('K2')->getValue())->toBe($alpha->id);
@@ -67,7 +67,7 @@ it('erzeugt dynamische Excel-Vorlagen für neue Kundengruppen und alle Gruppen',
     $sheet = $all->getSheetByName('Preise');
     $names = [];
     for ($row = 2; $row <= $sheet->getHighestDataRow(); $row++) {
-        $names[] = $sheet->getCell('B' . $row)->getValue();
+        $names[] = (string) $sheet->getCell('B' . $row)->getValue();
     }
     expect($names)->toContain($alpha->name, $beta->name);
     $all->disconnectWorksheets();
@@ -205,7 +205,7 @@ it('aktualisiert vorhandene manuelle Mengenpreise ohne Regeln zu löschen', func
     $this->actingAs(erp11Manager());
     $workbook = erp11Workbook($this, (string) $group->id, true);
     $sheet = $workbook->getSheetByName('Preise');
-    expect($sheet->getCell('C2')->getValue())->toBe('manuell');
+    expect((string) $sheet->getCell('C2')->getValue())->toBe('manuell');
     $sheet->setCellValue('H2', 8.12345);
     $upload = erp11Upload($workbook);
 
