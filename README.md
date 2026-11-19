@@ -44,7 +44,9 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Bestehende Preisstaffeln **und vorhandene manuelle Mengenregeln** können aktualisiert werden. Neue manuelle Mengenregeln zuerst über die Preisverwaltung anlegen. Excel fügt keine Regeln hinzu und entfernt oder archiviert keine Produkte, Gruppen oder Preisregeln.
 - Die Datei enthält höchstens 50.000 Importzeilen (10 MB Upload), Formeln und doppelte Preiszuordnungen werden abgewiesen. Nur Manager, Administratoren und Verkauf haben gemäß bestehenden Preisbereichs-Rollen Zugriff.
 - Der **Produkt-Excel-Import** bleibt davon unabhängig; er überschreibt weiterhin keine Preise.
-- Keine Datenbankmigration und keine zusätzliche Composer-Abhängigkeit für diese Funktion notwendig (verwendet die bereits vorhandene PhpSpreadsheet-Installation).
+- **Korrektur für große Exporte:** Der XLSX-Export schreibt die Tabellen zeilenweise in temporäre XML-Dateien und verarbeitet Produkte in kleinen Datenbankpaketen. Dadurch werden nicht mehr sämtliche Excel-Zellen im PHP-Arbeitsspeicher aufgebaut. Importiert wird weiterhin über PhpSpreadsheet.
+- **Fünf Nachkommastellen:** Produkt-Preisstaffeln und manuelle Mengenpreise speichern nun `DECIMAL(15,5)`. Export und Vorlagen zeigen Preise mit fünf Dezimalstellen; der Import akzeptiert maximal fünf. Die Preis-Eingabefelder haben die Schrittweite `0.00001`. Rechnungssummen in Euro bleiben auf zwei Cent-Stellen gerundet.
+- **Deployment:** Diese Korrektur enthält eine Datenbankmigration. Vor `php artisan migrate --force` Produktivdatenbank sichern und die neuen Tabellen-Spaltentypen prüfen. Der Import/Export benötigt keine neuen Composer-Pakete.
 
 ### Chargen & FIFO
 
