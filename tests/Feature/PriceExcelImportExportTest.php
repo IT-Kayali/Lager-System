@@ -304,3 +304,40 @@ it('speichert fünfstellige Preise auch über die normale Preisverwaltung', func
 
     expect((string) $tier->fresh()->price)->toBe('12.34567');
 });
+
+it('prueft auch einen ausgefuellten Gesamtpreisexport mit gebuendelten Datenbankabfragen', function () {
+    erp11Group('Importpaket A');
+    erp11Group('Importpaket B');
+    for ($i = 1; $i <= 60; $i++) {
+        erp11Product('Preisimport Produkt ' . $i);
+    }
+
+    $this->actingAs(erp11Manager());
+    $spreadsheet = erp11Workbook($this, 'all');
+    $sheet = $spreadsheet->getSheetByName('Preise');
+    expect($sheet->getHighestDataRow())->toBeGreaterThan(500);
+
+    // Beim Export sind alle Preiszellen gefuellt, auch unveraenderte.
+    // Nur die erste Zeile weicht von der Datenbank ab.
+    $sheet->setCellValue('H2', 0.12345);
+    $upload = erp11Upload($spreadsheet);
+
+    $selects = 0;
+    \Illuminate\Support\Facades\DB::listen(function ($query) use (&$selects): void {
+        if (preg_match('/\bfrom\s+[`"]?product_price_tiers/i', $query->sql)) {
+            $selects++;
+        }
+    });
+
+    try {
+        $response = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => 'all',
+        ])->assertOk();
+
+        expect($response->viewData('preview')['rows'])->toHaveCount(1)
+            ->and($selects)->toBeLessThan(20);
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
