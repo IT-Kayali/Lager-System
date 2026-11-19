@@ -69,6 +69,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 ### Filialausgänge
 
 - Der Filial-Lieferschein zeigt die vorhandene interne Lagernotiz unter den Produktpositionen an. Leere Notizen werden ausgelassen; längere Texte mit Zeilenumbrüchen werden über weitere PDF-Seiten verteilt, ohne die Fußzeile zu überlagern. Zugriffsrechte für die PDF bleiben Manager und Lager vorbehalten.
+- Arabische Lagernotizen werden beim PDF-Export zeilenweise für Dompdf aufbereitet (verbundene Zeichen, rechtsbündige Darstellung, lateinische Zeilen bleiben unverändert). Die Datenbanknotiz bleibt im Original erhalten. Dafür wird `khaled.alshamaa/ar-php` v7 via Composer benötigt; beim Serverupdate vor der Freigabe `composer install --no-dev --prefer-dist --optimize-autoloader` ausführen.
 - Mehrere Produkte pro Filialausgang
 - Filialauswahl
 - Statusbasierter Workflow

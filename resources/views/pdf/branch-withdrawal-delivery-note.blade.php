@@ -189,6 +189,14 @@
             word-wrap: break-word;
         }
 
+        /* Dompdf verbindet arabische Zeichen nicht selbst. Die Glyphen werden
+           pro Zeile vorbereitet und anschließend rechtsbündig dargestellt. */
+        .branch-note-line.arabic {
+            font-family: DejaVu Sans, sans-serif;
+            text-align: right;
+            direction: ltr;
+        }
+
         .ownership {
             position: absolute;
             left: 12mm;
@@ -261,6 +269,7 @@
     );
 
     $pageCount = $pages->count();
+    $arabicFormatter = null;
 @endphp
 
 @foreach ($pages as $pageIndex => $page)
@@ -332,7 +341,16 @@
                             Lagernotiz{{ $page['note_continued'] ? ' (Fortsetzung)' : '' }}:
                         </div>
                         @foreach ($page['note_lines'] as $line)
-                            <div class="branch-note-line">@if ($line === '')&nbsp;@else{{ $line }}@endif</div>
+                            @php
+                                $isArabicLine = preg_match('/\p{Arabic}/u', $line) === 1;
+                                $printableLine = $line;
+
+                                if ($isArabicLine) {
+                                    $arabicFormatter ??= new \ArPHP\I18N\Arabic();
+                                    $printableLine = $arabicFormatter->utf8Glyphs($line, 5000, false, true);
+                                }
+                            @endphp
+                            <div class="branch-note-line{{ $isArabicLine ? ' arabic' : '' }}">@if ($line === '')&nbsp;@else{{ $printableLine }}@endif</div>
                         @endforeach
                     </div>
                 @endif
