@@ -29,7 +29,8 @@ class PriceExcelImportPlan
             $this->reject('Das Tabellenblatt „Preise“ fehlt. Bitte die aktuelle Preisvorlage benutzen.');
         }
 
-        if ($sheet->getHighestDataRow() > 50001) {
+        $lastRow = $sheet->getHighestDataRow();
+        if ($lastRow > 50001) {
             $this->reject('Es sind maximal 50.000 Preiszeilen pro Import erlaubt.');
         }
 
@@ -43,7 +44,43 @@ class PriceExcelImportPlan
         $rows = [];
         $seen = [];
 
-        for ($line = 2; $line <= $sheet->getHighestDataRow(); $line++) {
+        // Preisregeln in Paketen abfragen. Ein Einzelabruf je Excel-Zeile
+        // verursachte bei Gesamtimporten mit Tausenden Preisen einen Timeout.
+        $recordCache = ['staffel' => collect(), 'manuell' => collect()];
+
+        for ($line = 2; $line <= $lastRow; $line++) {
+            if (($line - 2) % 250 === 0) {
+                $ids = ['staffel' => [], 'manuell' => []];
+                $chunkEnd = min($line + 249, $lastRow);
+
+                for ($candidateLine = $line; $candidateLine <= $chunkEnd; $candidateLine++) {
+                    $price = $sheet->getCell([8, $candidateLine])->getValue();
+                    if ($price === null || trim((string) $price) === '') {
+                        continue;
+                    }
+
+                    $candidateMode = trim((string) $sheet->getCell([3, $candidateLine])->getValue());
+                    $candidateId = filter_var(
+                        $sheet->getCell([12, $candidateLine])->getValue(),
+                        FILTER_VALIDATE_INT,
+                        ['options' => ['min_range' => 1]]
+                    );
+                    if ($candidateId && isset($ids[$candidateMode])) {
+                        $ids[$candidateMode][$candidateId] = $candidateId;
+                    }
+                }
+
+                foreach (['staffel', 'manuell'] as $candidateMode) {
+                    $ruleIds = array_values($ids[$candidateMode]);
+                    $recordCache[$candidateMode] = $ruleIds === []
+                        ? collect()
+                        : ($candidateMode === 'staffel' ? ProductPriceTier::query() : ManualPriceRule::query())
+                            ->whereKey($ruleIds)
+                            ->with(['product.categories', 'customerGroup'])
+                            ->get()
+                            ->keyBy('id');
+                }
+            }
             $values = [];
             foreach (self::HEADERS as $index => $header) {
                 $cell = $sheet->getCell([$index + 1, $line]);
@@ -94,9 +131,7 @@ class PriceExcelImportPlan
             }
             $newPrice = number_format((float) $priceText, 5, '.', '');
 
-            $record = ($mode === 'staffel' ? ProductPriceTier::query() : ManualPriceRule::query())
-                ->with(['product.categories', 'customerGroup'])
-                ->find($id);
+            $record = $recordCache[$mode]->get($id);
 
             if ($record === null) {
                 $this->reject("Zeile {$line}: Die zugehörige Preisregel existiert nicht mehr.");
