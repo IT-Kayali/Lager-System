@@ -120,7 +120,13 @@ class PriceExcelController extends Controller
         $service->groupId($scope);
 
         try {
-            $spreadsheet = IOFactory::load($data['excel_file']->getRealPath());
+            // Nur das benoetigte Preisblatt ohne Formatobjekte laden.
+            // Das Anleitung-Blatt wird fuer die Vorschau nicht gebraucht.
+            $path = $data['excel_file']->getRealPath();
+            $reader = IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $reader->setLoadSheetsOnly(['Preise']);
+            $spreadsheet = $reader->load($path);
             try {
                 $preview = $service->prepare($spreadsheet, $scope);
             } finally {
