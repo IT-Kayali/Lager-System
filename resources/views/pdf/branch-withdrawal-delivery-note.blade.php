@@ -342,11 +342,11 @@
                         </div>
                         @foreach ($page['note_lines'] as $line)
                             @php
-                                $isArabicLine = preg_match('/\\p{Arabic}/u', $line) === 1;
+                                $isArabicLine = preg_match('/\p{Arabic}/u', $line) === 1;
                                 $printableLine = $line;
 
                                 if ($isArabicLine) {
-                                    $arabicFormatter ??= new \\ArPHP\\I18N\\Arabic();
+                                    $arabicFormatter ??= new \ArPHP\I18N\Arabic();
                                     $printableLine = $arabicFormatter->utf8Glyphs($line, 5000, false, true);
                                 }
                             @endphp
