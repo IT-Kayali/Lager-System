@@ -34,7 +34,7 @@ function parseGermanNumber(value) {
     return nativeParseFloat(normalizeGermanNumber(String(value ?? '')));
 }
 
-function formatGermanNumber(value, maximumFractionDigits = 2) {
+function formatGermanNumber(value, maximumFractionDigits = 2, minimumFractionDigits = 2) {
     const parsed = parseGermanNumber(value);
 
     if (!Number.isFinite(parsed)) {
@@ -42,7 +42,7 @@ function formatGermanNumber(value, maximumFractionDigits = 2) {
     }
 
     return new Intl.NumberFormat('de-DE', {
-        minimumFractionDigits: 2,
+        minimumFractionDigits,
         maximumFractionDigits,
         useGrouping: true,
     }).format(parsed);
@@ -58,6 +58,7 @@ const decimalFieldSelector = [
     'input[name="shipping_price_gross"]',
     'input[name="tax_rate"]',
     'input[name^="prices["]',
+    'input[name^="rules["][name$="[price]"]',
     'input[name$="[quantity]"]',
     'input[data-name="quantity"]',
 ].join(',');
@@ -68,6 +69,13 @@ function isQuantityField(input) {
     return name === 'quantity'
         || name.endsWith('[quantity]')
         || input.dataset.name === 'quantity';
+}
+
+function isPriceField(input) {
+    const name = input.getAttribute('name') || '';
+
+    return /^prices\[[^\]]+\]$/.test(name)
+        || /^rules\[\d+\]\[price\]$/.test(name);
 }
 
 function enhanceDecimalField(input) {
@@ -87,7 +95,14 @@ function enhanceDecimalField(input) {
 
     const format = () => {
         if (input.value.trim() !== '') {
-            input.value = formatGermanNumber(input.value, isQuantityField(input) ? 3 : 2);
+            const isPrice = isPriceField(input);
+            const maximumFractionDigits = isPrice ? 5 : (isQuantityField(input) ? 3 : 2);
+
+            input.value = formatGermanNumber(
+                input.value,
+                maximumFractionDigits,
+                isPrice ? 5 : 2,
+            );
         }
     };
 
