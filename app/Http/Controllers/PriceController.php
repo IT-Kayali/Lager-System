@@ -88,7 +88,7 @@ class PriceController extends Controller
     {
         $data = $request->validate([
             'prices' => ['required', 'array'],
-            'prices.*' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'prices.*' => ['required', 'numeric', 'decimal:0,5', 'min:0', 'max:999999999'],
         ]);
 
         ProductPriceTier::ensureForProduct($product);
@@ -101,7 +101,7 @@ class PriceController extends Controller
                 ->firstOrFail();
 
             $oldPrice = (float) $tier->price;
-            $newPrice = round((float) $price, 2);
+            $newPrice = round((float) $price, 5);
 
             if ($oldPrice !== $newPrice) {
                 $tier->update([
@@ -146,7 +146,7 @@ class PriceController extends Controller
             'rules' => ['required', 'array', 'min:1', 'max:100'],
             'rules.*.min_quantity' => ['required', 'numeric', 'min:0.001', 'max:999999999.999'],
             'rules.*.max_quantity' => ['nullable', 'numeric', 'gte:rules.*.min_quantity', 'max:999999999.999'],
-            'rules.*.price' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'rules.*.price' => ['required', 'numeric', 'decimal:0,5', 'min:0', 'max:999999999'],
             'rules.*.label' => ['nullable', 'string', 'max:100'],
         ], [
             'rules.required' => 'Bitte mindestens eine Preisregel anlegen.',
@@ -162,7 +162,7 @@ class PriceController extends Controller
                 'max_quantity' => filled($rule['max_quantity'] ?? null)
                     ? round((float) $rule['max_quantity'], 3)
                     : null,
-                'price' => round((float) $rule['price'], 2),
+                'price' => round((float) $rule['price'], 5),
                 'label' => filled($rule['label'] ?? null) ? trim((string) $rule['label']) : null,
             ])
             ->sortBy('min_quantity')
