@@ -42,7 +42,7 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - **Vorlage:** Spalte `price` ist leer; **Export:** aktuelle Preise sind eingetragen. Ausschließlich `price` bearbeiten und anschließend die Datei zur Vorschau hochladen. Deutsche Dezimalzahlen (z. B. `12,50`) werden angenommen. Leere Zellen werden ignoriert, ausdrücklich eingetragene `0` wird übernommen.
 - Die Vorschau prüft alle gefüllten Preiszeilen und zeigt die Differenz zwischen Alt und Neu. Erst nach Auswahl und Bestätigung werden die Preise atomar aktualisiert und im Aktivitätsprotokoll dokumentiert. Parallel geänderte Preise oder Mengenregeln werden zurückgewiesen.
 - Bestehende Preisstaffeln **und vorhandene manuelle Mengenregeln** können aktualisiert werden. Neue manuelle Mengenregeln zuerst über die Preisverwaltung anlegen. Excel fügt keine Regeln hinzu und entfernt oder archiviert keine Produkte, Gruppen oder Preisregeln.
-- Die Datei enthält höchstens 10.000 Importzeilen (10 MB Upload), Formeln und doppelte Preiszuordnungen werden abgewiesen. Nur Manager, Administratoren und Verkauf haben gemäß bestehenden Preisbereichs-Rollen Zugriff.
+- Die Datei enthält höchstens 50.000 Importzeilen (10 MB Upload), Formeln und doppelte Preiszuordnungen werden abgewiesen. Nur Manager, Administratoren und Verkauf haben gemäß bestehenden Preisbereichs-Rollen Zugriff.
 - Der **Produkt-Excel-Import** bleibt davon unabhängig; er überschreibt weiterhin keine Preise.
 - Keine Datenbankmigration und keine zusätzliche Composer-Abhängigkeit für diese Funktion notwendig (verwendet die bereits vorhandene PhpSpreadsheet-Installation).
 
