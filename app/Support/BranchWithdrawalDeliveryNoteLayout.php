@@ -18,7 +18,12 @@ final class BranchWithdrawalDeliveryNoteLayout
     private const ROW_EXTRA_LINE_MM = 4.5;
     private const NOTE_HEADING_MM = 11.0;
     private const NOTE_LINE_MM = 5.5;
-    private const NOTE_WRAP_WIDTH = 76;
+    // Konservatives Zeichenbudget: bei Exo 10 pt bleibt auch eine Zeile
+    // aus breiten Zeichen (z. B. W) innerhalb der 184-mm-Notizspalte.
+    // mb_strwidth() ist keine Fontmessung; ausreichend Reserve einplanen.
+    private const NOTE_WRAP_WIDTH = 40;
+    private const DESCRIPTION_WRAP_WIDTH = 30;
+    private const QUANTITY_WRAP_WIDTH = 12;
 
     public static function paginate(Collection $items, string $note): Collection
     {
@@ -93,10 +98,10 @@ final class BranchWithdrawalDeliveryNoteLayout
         $lines = 0;
 
         foreach (preg_split('/\R/u', $description) ?: [''] as $part) {
-            $lines += max(1, (int) ceil(mb_strwidth($part, 'UTF-8') / 54));
+            $lines += max(1, (int) ceil(mb_strwidth($part, 'UTF-8') / self::DESCRIPTION_WRAP_WIDTH));
         }
 
-        $lines = max($lines, (int) ceil(mb_strwidth($quantity, 'UTF-8') / 22), 1);
+        $lines = max($lines, (int) ceil(mb_strwidth($quantity, 'UTF-8') / self::QUANTITY_WRAP_WIDTH), 1);
 
         return self::ROW_BASE_MM + ($lines - 1) * self::ROW_EXTRA_LINE_MM;
     }
