@@ -12,6 +12,7 @@ use App\Http\Controllers\OfferInternalNoteController;
 use App\Http\Controllers\OfferPdfController;
 use App\Http\Controllers\OfferStatusController;
 use App\Http\Controllers\PriceController;
+use App\Http\Controllers\PriceExcelController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExcelController;
@@ -106,6 +107,11 @@ Route::middleware(['auth'])->group(function () {
     Route::match(['put', 'patch'], '/customers/{customer}', [CustomerController::class, 'update'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES . ',' . User::ROLE_CRM)->name('customers.update');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('customers.show');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('customers.destroy');
+    Route::get('/prices/excel/export', [PriceExcelController::class, 'export'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.export');
+    Route::get('/prices/excel/template', [PriceExcelController::class, 'template'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.template');
+    Route::get('/prices/excel/import', [PriceExcelController::class, 'importForm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.form');
+    Route::post('/prices/excel/import', [PriceExcelController::class, 'import'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import');
+    Route::post('/prices/excel/import/confirm', [PriceExcelController::class, 'confirm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.excel.import.confirm');
     Route::get('/prices', [PriceController::class, 'index'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.index');
     Route::put('/prices', [PriceController::class, 'update'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_SALES)->name('prices.update');
 

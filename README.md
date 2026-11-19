@@ -34,6 +34,18 @@ Das System verbindet Produkt- und Chargenverwaltung, FIFO-Lagerlogik, Kunden und
 - Der Produktimport/-export und der zukünftige Preisstaffelimport/-export auf der Seite **Preise** sind eigenständige Arbeitsabläufe. Der Produktimport darf Preise nicht überschreiben.
 - Archivierte Produkte bleiben als Datenbankdatensätze für historische Belege und Lagerbewegungen erhalten. Im normalen Produkt- und Preisbereich sowie in neuen Auswahllisten werden aktive Produkte angezeigt. Ein separates Archiv-Menü mit Such- und Wiederherstellungsfunktion muss noch entwickelt werden.
 
+### Preise – Excel nach Kundengruppen (Änderung 11)
+
+- Im Preisbereich stehen **Importvorlage**, **Preise exportieren** und **Preise importieren** zur Verfügung; jeweils für **eine ausgewählte Kundengruppe** oder **alle Kundengruppen**.
+- Die Kundengruppen und die vorhandenen Mengenstaffeln werden bei jedem Download dynamisch aus der Datenbank geladen. Neue Kundengruppen oder Staffeldefinitionen benötigen keine feste Excel-Spalte und keinen Programmumbau.
+- Die Excel-Tabelle **Preise** enthält Produktname, Kundengruppe, Preisart (`staffel` oder `manuell`), Preisstufe, Von-/Bis-Menge, Einheit, Preis und Beschreibung. Ausgeblendete IDs schützen die Zuordnung zu einer vorhandenen Preisregel. Ein zweites Blatt **Anleitung** erklärt die Bedienung.
+- **Vorlage:** Spalte `price` ist leer; **Export:** aktuelle Preise sind eingetragen. Ausschließlich `price` bearbeiten und anschließend die Datei zur Vorschau hochladen. Deutsche Dezimalzahlen (z. B. `12,50`) werden angenommen. Leere Zellen werden ignoriert, ausdrücklich eingetragene `0` wird übernommen.
+- Die Vorschau prüft alle gefüllten Preiszeilen und zeigt die Differenz zwischen Alt und Neu. Erst nach Auswahl und Bestätigung werden die Preise atomar aktualisiert und im Aktivitätsprotokoll dokumentiert. Parallel geänderte Preise oder Mengenregeln werden zurückgewiesen.
+- Bestehende Preisstaffeln **und vorhandene manuelle Mengenregeln** können aktualisiert werden. Neue manuelle Mengenregeln zuerst über die Preisverwaltung anlegen. Excel fügt keine Regeln hinzu und entfernt oder archiviert keine Produkte, Gruppen oder Preisregeln.
+- Die Datei enthält höchstens 50.000 Importzeilen (10 MB Upload), Formeln und doppelte Preiszuordnungen werden abgewiesen. Nur Manager, Administratoren und Verkauf haben gemäß bestehenden Preisbereichs-Rollen Zugriff.
+- Der **Produkt-Excel-Import** bleibt davon unabhängig; er überschreibt weiterhin keine Preise.
+- Keine Datenbankmigration und keine zusätzliche Composer-Abhängigkeit für diese Funktion notwendig (verwendet die bereits vorhandene PhpSpreadsheet-Installation).
+
 ### Chargen & FIFO
 
 - Wareneingänge und Chargenverwaltung
