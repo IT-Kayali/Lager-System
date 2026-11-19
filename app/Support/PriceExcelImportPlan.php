@@ -29,8 +29,8 @@ class PriceExcelImportPlan
             $this->reject('Das Tabellenblatt „Preise“ fehlt. Bitte die aktuelle Preisvorlage benutzen.');
         }
 
-        if ($sheet->getHighestDataRow() > 10001) {
-            $this->reject('Es sind maximal 10.000 Preiszeilen pro Import erlaubt.');
+        if ($sheet->getHighestDataRow() > 50001) {
+            $this->reject('Es sind maximal 50.000 Preiszeilen pro Import erlaubt.');
         }
 
         foreach (self::HEADERS as $index => $header) {
@@ -212,7 +212,7 @@ class PriceExcelImportPlan
 
         $normalized = GermanNumber::parse($value);
         if (! is_numeric($normalized)) {
-            return null;
+            return 'INVALID:' . (string) $value;
         }
 
         return number_format((float) $normalized, 3, '.', '');
