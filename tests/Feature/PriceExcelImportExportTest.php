@@ -521,3 +521,24 @@ it('verhindert die Anlage einer Stückregel bei Änderung nach der Vorschau', fu
         @unlink($upload->getRealPath());
     }
 });
+
+it('begrenzt die Auswahl auch bei 2000 Preiszeilen nicht auf max_input_vars', function () {
+    $user = erp11Manager();
+    $this->actingAs($user);
+
+    $token = \Illuminate\Support\Str::random(48);
+    $rows = array_map(fn (int $line) => ['line' => $line], range(2, 2002));
+    \Illuminate\Support\Facades\Cache::put(
+        'price-excel-import:' . $user->id . ':' . $token,
+        ['scope' => 'all', 'rows' => $rows],
+        now()->addMinutes(30)
+    );
+
+    $this->postJson(route('prices.excel.import.begin'), [
+        'preview_token' => $token,
+        'excluded_rows_csv' => '2,3',
+    ])->assertOk()
+        ->assertJsonPath('total', 1999)
+        ->assertJsonPath('processed', 0)
+        ->assertJsonPath('done', false);
+});
