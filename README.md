@@ -1090,8 +1090,10 @@ wurden vereinheitlicht.
 - Keine bestehenden Datenbank-IDs, Lagerbestände,
   Chargen oder Zuordnungen umnummeriert.
 
-### PDF-Positionen und Chargen (Entwurf)
+### PDF-Positionen und Chargen
 
-- Filial-Lieferscheine nummerieren Produktpositionen fortlaufend über alle Seiten. Unter der Produktbezeichnung erscheint die jüngste tatsächlich zugeordnete Charge in kleiner Schrift, sofern eine gültige Zuordnung vorliegt.
-- Maßgeblich ist das Wareneingangsdatum, bei Gleichstand die interne Batch-ID. Lagerbestände und FIFO-Abbuchungen werden nicht verändert. Der Seitenplan reserviert Platz für die zusätzliche Zeile und bestehende Lagernotizen.
-- Kunden-Lieferscheine sowie Angebote und Rechnungen werden erst nach Abgleich der lokalen Produktionsänderungen ergänzt; dieser Branch ist noch nicht zur Installation freigegeben.
+- Angebote, Rechnungen und Kunden-Lieferscheine (mit und ohne Logo) sowie Filial-Lieferscheine zeigen eine fortlaufende Positionsnummer über alle Seiten. Versandkosten und Leerzeilen werden nicht nummeriert.
+- Nur Lieferscheine zeigen unter der Produktbezeichnung in kleiner grauer Schrift die jüngste tatsächlich zugeordnete Charge (Wareneingangsdatum, bei Gleichstand Batch-ID). Kunden-Lieferscheine nutzen die FIFO-Ausgangsbewegungen des konkreten Angebots, Filial-Lieferscheine die gespeicherten Positionszuordnungen.
+- Ohne tatsächliche Lagerbewegungen oder bei nicht eindeutig rekonstruierbaren historischen Zuordnungen bleibt die Batchzeile leer. Bestehende Kundenbewegungen referenzieren die aktuelle Batch-Stammdatenzeile; gelöschte oder nicht mehr zuordenbare Chargen werden nicht geraten.
+- Die dynamischen Kunden-Lieferscheinlayouts aus der bisherigen Produktion einschließlich Bestellnotizen wurden in Git übernommen. Seitenplanung berücksichtigt den zusätzlichen Platz für Batchzeilen; Filial-Lagernotizen und bestehende arabische Darstellung bleiben erhalten.
+- Keine Migration, keine Änderung der Lagerbuchung, Reservierung, Preisberechnung oder FIFO-Logik.
