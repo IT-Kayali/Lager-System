@@ -22,7 +22,9 @@ final class BranchWithdrawalDeliveryNoteLayout
     // aus breiten Zeichen (z. B. W) innerhalb der 184-mm-Notizspalte.
     // mb_strwidth() ist keine Fontmessung; ausreichend Reserve einplanen.
     private const NOTE_WRAP_WIDTH = 40;
-    private const DESCRIPTION_WRAP_WIDTH = 30;
+    private const DESCRIPTION_WRAP_WIDTH = 26;
+    private const BATCH_WRAP_WIDTH = 36;
+    private const BATCH_LINE_MM = 4.0;
     private const QUANTITY_WRAP_WIDTH = 12;
 
     public static function paginate(Collection $items, string $note): Collection
@@ -103,7 +105,15 @@ final class BranchWithdrawalDeliveryNoteLayout
 
         $lines = max($lines, (int) ceil(mb_strwidth($quantity, 'UTF-8') / self::QUANTITY_WRAP_WIDTH), 1);
 
-        return self::ROW_BASE_MM + ($lines - 1) * self::ROW_EXTRA_LINE_MM;
+        $batch = trim((string) ($item->batch_number ?? ''));
+        $batchHeight = 0.0;
+        if ($batch !== '') {
+            foreach (preg_split('/\R/u', 'Batch: ' . $batch) ?: [''] as $part) {
+                $batchHeight += max(1, (int) ceil(mb_strwidth($part, 'UTF-8') / self::BATCH_WRAP_WIDTH)) * self::BATCH_LINE_MM;
+            }
+        }
+
+        return self::ROW_BASE_MM + ($lines - 1) * self::ROW_EXTRA_LINE_MM + $batchHeight;
     }
 
     private static function wrapNote(string $note): array
