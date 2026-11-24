@@ -20,6 +20,8 @@ use App\Services\ReservationReleaseService;
 
 class ProductController extends Controller
 {
+    private const PAGE_SIZE = 15;
+
     public function index(Request $request): View
     {
         app(\App\Services\ReservationReleaseService::class)->releaseExpired();
@@ -40,7 +42,7 @@ class ProductController extends Controller
                 fn ($query) => $query->naturalNameOrder($direction),
                 fn ($query) => $query->naturalNameOrder()
             )
-            ->paginate(15)
+            ->paginate(self::PAGE_SIZE)
             ->withQueryString();
 
         return view('pages.products.index', compact('products', 'search', 'searchField', 'exact', 'productListQuery'));
@@ -231,7 +233,8 @@ class ProductController extends Controller
     {
         // Product routes also accept numeric legacy IDs. A stale name-based
         // form must not accidentally delete another product with that ID.
-        if ($request->has('expected_product_id') && (string) $request->input('expected_product_id') !== (string) $product->id) {
+        $expectedId = $request->input('expected_product_id');
+        if ($request->has('expected_product_id') && (! is_scalar($expectedId) || (string) $expectedId !== (string) $product->id)) {
             return $this->returnToProductList($request)
                 ->with('error', 'Produkt hat sich geändert. Bitte aktualisiere die Produktliste.');
         }
@@ -248,7 +251,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'bulk_action' => ['required', Rule::in(['delete'])],
-            'product_ids' => ['required', 'array', 'list', 'min:1', 'max:15'],
+            'product_ids' => ['required', 'array', 'list', 'min:1', 'max:' . self::PAGE_SIZE],
             'product_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
         ]);
 
@@ -264,7 +267,7 @@ class ProductController extends Controller
 
         $response = $this->returnToProductList($request);
         if ($deleted > 0) {
-            $response->with('success', $deleted . ' Produkte gelöscht.');
+            $response->with('success', $deleted === 1 ? '1 Produkt gelöscht.' : $deleted . ' Produkte gelöscht.');
         }
         if ($skipped > 0) {
             $response->with('error', $skipped . ' Produkte nicht gelöscht: bereits verwendet, archiviert oder nicht mehr vorhanden. Historische Daten bleiben erhalten.');
@@ -277,7 +280,7 @@ class ProductController extends Controller
     {
         $context = $this->listContext($request);
         if (($context['page'] ?? 1) > 1) {
-            $lastPage = max(1, (int) ceil($this->filteredProducts($context)->count() / 15));
+            $lastPage = max(1, (int) ceil($this->filteredProducts($context)->count() / self::PAGE_SIZE));
             $context['page'] = min($context['page'], $lastPage);
         }
 
