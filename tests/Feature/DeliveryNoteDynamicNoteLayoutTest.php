@@ -43,3 +43,21 @@ it('keeps the note and all line items when the item list is empty', function () 
     expect($pages)->toHaveCount(1)
         ->and($pages->first()['note_lines'])->not->toBeEmpty();
 });
+
+it('reserves space for batch lines and keeps the original position across page breaks', function (bool $branded) {
+    $items = collect(range(1, 35))->map(fn (int $position) => (object) [
+        'position' => $position,
+        'product' => 'Produkt ' . $position,
+        'quantity' => '100,00',
+        'unit' => 'Gramm',
+        'batch_number' => str_repeat('W', 72),
+    ]);
+
+    $pages = DeliveryNoteLayout::paginate($items, 'Lange Bestellnotiz bleibt unter den Positionen.', true, $branded);
+    expect($pages->count())->toBeGreaterThan(1)
+        ->and($pages->flatMap(fn (array $page) => $page['items'])->pluck('position')->all())->toBe(range(1, 35));
+
+    foreach ($pages as $page) {
+        expect($page['used_mm'])->toBeLessThanOrEqual($page['available_mm']);
+    }
+})->with([true, false]);
