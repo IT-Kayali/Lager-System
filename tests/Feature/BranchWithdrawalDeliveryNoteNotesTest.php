@@ -208,7 +208,7 @@ it('shows only the newest assigned batch beneath the product and includes a posi
 
     $html = branchNotePdfHtml($withdrawal->fresh('items.product'));
     expect($html)
-        ->toContain('<th>Pos.</th>')
+        ->toContain('<th style="width:8%;text-align:center">Pos.</th>')
         ->toContain('<td>1</td>')
         ->toContain('class="batch-number">Batch: NEW-BATCH')
         ->not->toContain('OLD-BATCH')
