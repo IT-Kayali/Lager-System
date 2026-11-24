@@ -111,7 +111,7 @@ it('protects stock and historical records for both deletion actions and skips pr
         'bulk_action' => 'delete',
         'product_ids' => collect($protected)->pluck('id')->push($unused->id)->push(99999999)->all(),
     ])->assertRedirect(route('products.index'))
-        ->assertSessionHas('success', '1 Produkte gelöscht.')
+        ->assertSessionHas('success', '1 Produkt gelöscht.')
         ->assertSessionHas('error');
 
     $this->assertDatabaseMissing('products', ['id' => $unused->id]);
