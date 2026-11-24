@@ -40,9 +40,8 @@ class PriceExcelController extends Controller
             ->ordered()
             ->get();
 
-        // Maximal 50 Produkte sowie deren aktuelle Preise gleichzeitig laden.
-        // Der XLSX-Schreiber schreibt XML auf die Festplatte statt alle Zellen
-        // als PhpSpreadsheet-Objekte im Arbeitsspeicher zu halten.
+        // Preise paketweise laden. Das Standardformat bleibt ein Streaming-Export;
+        // die kompakte Matrix hat eigene Größenlimits.
         $format = $request->validate(['format' => ['nullable', 'in:standard,compact']])['format'] ?? 'standard';
         $compact = $format === 'compact';
         $writer = $compact
@@ -121,7 +120,7 @@ class PriceExcelController extends Controller
         $writer->finish($path);
 
         $suffix = $groupId === null ? 'alle-gruppen' : 'gruppe-' . $groupId;
-        $name = ($template ? 'preisvorlage-' : 'preise-').($compact ? 'kompakt-' : '');
+        $name = ($template ? 'preisvorlage-' : 'preise-') . ($compact ? 'kompakt-' : '');
 
         return response()->download($path, $name . $suffix . '.xlsx')->deleteFileAfterSend(true);
     }
@@ -144,8 +143,7 @@ class PriceExcelController extends Controller
         $service->groupId($scope);
 
         try {
-            // Nur das benoetigte Preisblatt ohne Formatobjekte laden.
-            // Das Anleitung-Blatt wird fuer die Vorschau nicht gebraucht.
+            // Nur Preisblätter ohne Formatobjekte laden; Anleitung überspringen.
             $path = $data['excel_file']->getRealPath();
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(true);
@@ -159,7 +157,7 @@ class PriceExcelController extends Controller
                         $cells += $info['totalRows'] * $info['totalColumns'];
                     }
                 }
-                if ($cells > 210000 || count($sheets) > 100) {
+                if ($sheets === [] || $cells > 210000 || count($sheets) > 100) {
                     throw ValidationException::withMessages(['excel_file' => 'Die kompakte Preisdatei ist zu groß. Bitte eine einzelne Kundengruppe exportieren.']);
                 }
                 $reader->setLoadSheetsOnly($sheets);
