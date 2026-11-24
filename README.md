@@ -1089,3 +1089,9 @@ wurden vereinheitlicht.
   Entwicklungs- oder CI-Umgebung ausgeführt werden.
 - Keine bestehenden Datenbank-IDs, Lagerbestände,
   Chargen oder Zuordnungen umnummeriert.
+
+### PDF-Positionen und Chargen (Entwurf)
+
+- Filial-Lieferscheine nummerieren Produktpositionen fortlaufend über alle Seiten. Unter der Produktbezeichnung erscheint die jüngste tatsächlich zugeordnete Charge in kleiner Schrift, sofern eine gültige Zuordnung vorliegt.
+- Maßgeblich ist das Wareneingangsdatum, bei Gleichstand die interne Batch-ID. Lagerbestände und FIFO-Abbuchungen werden nicht verändert. Der Seitenplan reserviert Platz für die zusätzliche Zeile und bestehende Lagernotizen.
+- Kunden-Lieferscheine sowie Angebote und Rechnungen werden erst nach Abgleich der lokalen Produktionsänderungen ergänzt; dieser Branch ist noch nicht zur Installation freigegeben.
