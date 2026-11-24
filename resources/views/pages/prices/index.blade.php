@@ -25,6 +25,11 @@
                     <option value="{{ $group->id }}" @selected($selectedGroup?->id === $group->id)>{{ $group->name }}</option>
                 @endforeach
             </select>
+            <label for="price-excel-format">Excel-Format</label>
+            <select id="price-excel-format" name="format" class="premium-select erp-list-select">
+                <option value="standard">Standard (Preiszeilen)</option>
+                <option value="compact">Kompakt (je Einheit ein Blatt)</option>
+            </select>
             <button type="submit" formaction="{{ route('prices.excel.template') }}" class="premium-btn">
                 <i class="bi bi-file-earmark-spreadsheet"></i> Importvorlage herunterladen
             </button>
