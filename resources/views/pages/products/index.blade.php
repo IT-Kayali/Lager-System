@@ -2,6 +2,7 @@
     @php
         $isSales = auth()->user()?->isSales();
         $productIndexRoute = $isSales ? 'sales.products.index' : 'products.index';
+        $productListQuery = $productListQuery ?? [];
         $productShowRoute = $isSales ? 'sales.products.show' : 'products.show';
         $branchCreateRoute = $isSales ? 'sales.branch-withdrawals.create' : 'branch-withdrawals.create';
         $canCreateBranchWithdrawal = $isSales
@@ -67,10 +68,24 @@
     </section>
 
     <section class="products-modern-card erp-list-card">
+        @unless($isSales)
+            <form id="products-bulk-form" method="POST" action="{{ route('products.bulk-action', $productListQuery) }}" class="products-bulk-toolbar" data-product-bulk-runtime data-confirm="Ausgewählte Produkte wirklich löschen?">
+                @csrf
+                <select name="bulk_action" class="premium-input products-bulk-select" aria-label="Aktionen für ausgewählte Produkte" required>
+                    <option value="">Aktionen</option>
+                    <option value="delete">Ausgewählte löschen</option>
+                </select>
+                <button type="submit" class="premium-btn" data-product-bulk-submit disabled>Anwenden</button>
+                <span class="products-bulk-count" data-product-bulk-count aria-live="polite">0 Produkte ausgewählt</span>
+            </form>
+        @endunless
         <div class="products-table-shell modern-products-table-shell erp-list-table-shell">
             <table class="products-clean-table modern-products-table">
                 <thead>
                     <tr>
+                        @unless($isSales)
+                            <th class="products-bulk-cell"><input type="checkbox" data-product-bulk-all aria-label="Alle Produkte dieser Seite auswählen" @disabled($products->isEmpty())></th>
+                        @endunless
                         <th>Produktbezeichnung</th>
                         <th>Fake Name</th>
                         <th>Code-Nummer</th>
@@ -93,6 +108,9 @@
                         @endphp
 
                         <tr>
+                            @unless($isSales)
+                                <td class="products-bulk-cell"><input type="checkbox" name="product_ids[]" value="{{ $product->id }}" form="products-bulk-form" data-product-bulk-item aria-label="Produkt {{ $product->name }} auswählen"></td>
+                            @endunless
                             <td>
                                 <a class="product-name product-name-link" href="{{ route($productShowRoute, $product) }}">
                                     {{ $product->name }}
@@ -130,9 +148,10 @@
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
 
-                                        <form method="POST" action="{{ route('products.destroy', $product) }}" data-confirm="Produkt wirklich löschen?">
+                                        <form method="POST" action="{{ route('products.destroy', ['product' => $product] + $productListQuery) }}" data-confirm="Produkt wirklich löschen?">
                                             @csrf
                                             @method('DELETE')
+                                            <input type="hidden" name="expected_product_id" value="{{ $product->id }}">
                                             <button class="premium-icon-btn premium-danger" type="submit" title="Löschen">
                                                 <i class="bi bi-trash"></i>
                                             </button>
@@ -143,7 +162,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8">
+                            <td colspan="{{ $isSales ? 8 : 9 }}">
                                 <div class="products-empty-state">
                                     <i class="bi bi-box-seam"></i>
                                     <strong>Noch keine Produkte vorhanden.</strong>
@@ -160,4 +179,7 @@
     </section>
 
 
+    @unless($isSales)
+        <script src="{{ asset('js/products-bulk-actions.js') }}?v=1" defer></script>
+    @endunless
 </x-layouts.premium>

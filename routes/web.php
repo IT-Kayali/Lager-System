@@ -50,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/products/excel/import', [ProductExcelController::class, 'importForm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('products.excel.import.form');
     Route::post('/products/excel/import', [ProductExcelController::class, 'import'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('products.excel.import');
     Route::post('/products/excel/import/confirm', [ProductExcelController::class, 'confirm'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('products.excel.import.confirm');
+    Route::post('/products/bulk-action', [ProductController::class, 'bulkAction'])->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('products.bulk-action');
     Route::resource('products', ProductController::class)->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE);
     Route::resource('product-categories', ProductCategoryController::class)->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE);
     Route::get('/kategorien', fn () => redirect()->route('product-categories.index'))->middleware('role:' . User::ROLE_MANAGER . ',' . User::ROLE_WAREHOUSE)->name('product-categories.redirect');
