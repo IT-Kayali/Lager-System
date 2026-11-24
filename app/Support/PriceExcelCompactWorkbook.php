@@ -63,6 +63,10 @@ class PriceExcelCompactWorkbook
             $help->getColumnDimension('A')->setWidth(105);
             $help->getStyle('A1')->getFont()->setBold(true)->setSize(16);
 
+            if ($this->units === [] || count($this->units) > 100) {
+                self::reject('Keine oder zu viele Einheitentabellen für das Kompaktformat vorhanden.');
+            }
+
             $slots = 0;
             foreach ($this->units as $unit) {
                 $width = count($unit['columns']);
@@ -118,7 +122,7 @@ class PriceExcelCompactWorkbook
             $col = $index + 3;
             if ($previous !== $column[0]) {
                 if ($previous !== null && $col - 1 > $groupStart) {
-                    $sheet->mergeCells(self::address($groupStart, 1).':'.self::address($col - 1, 1));
+                    $sheet->mergeCells(self::address($groupStart, 1).':' . self::address($col - 1, 1));
                 }
                 $groupStart = $col;
                 $previous = $column[0];
@@ -126,16 +130,18 @@ class PriceExcelCompactWorkbook
                 self::writeText($sheet, $col, 1, (string) $column[1]);
             }
             self::writeText($sheet, $col, 2, self::rangeLabel($column));
-            $sheet->getStyle(self::address($col, 1).':'.self::address($col, 2))
+            $sheet->getStyle(self::address($col, 1).':' . self::address($col, 2))
                 ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($colors[$groupIndex % count($colors)]);
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col))->setWidth(25);
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $width))->setVisible(false);
             $index++;
         }
         if ($width + 2 > $groupStart) {
-            $sheet->mergeCells(self::address($groupStart, 1).':'.self::address($width + 2, 1));
+            $sheet->mergeCells(self::address($groupStart, 1).':' . self::address($width + 2, 1));
         }
 
+        $sheet->getStyle('C3:' . self::address($width + 2, count($products) + 2))
+            ->getNumberFormat()->setFormatCode('0.00000');
         $row = 3;
         foreach ($products as $product) {
             self::writeText($sheet, 1, $row, $product['name']);
@@ -152,15 +158,14 @@ class PriceExcelCompactWorkbook
                 if ($values[7] !== null) {
                     $sheet->setCellValueExplicit($cell, (float) $values[7], DataType::TYPE_NUMERIC);
                 }
-                $sheet->getStyle($cell)->getNumberFormat()->setFormatCode('0.00000');
                 $values[7] = null;
                 $json = json_encode($values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-                self::writeText($sheet, $col + $width, $row, hash_hmac('sha256', $json, (string) config('app.key')).':'.$json);
+                self::writeText($sheet, $col + $width, $row, hash_hmac('sha256', $json, (string) config('app.key')) . ':' . $json);
             }
             $row++;
         }
 
-        $sheet->getStyle('A1:'.self::address($width + 2, 2))->getFont()->setBold(true);
+        $sheet->getStyle('A1:' . self::address($width + 2, 2))->getFont()->setBold(true);
         $sheet->freezePane('C3');
     }
 
@@ -176,7 +181,7 @@ class PriceExcelCompactWorkbook
             }
             $units++;
             if (self::readCell($sheet, 2, 1) !== self::MARKER) {
-                self::reject('Unbekanntes Preisblatt: '.$sheet->getTitle());
+                self::reject('Unbekanntes Preisblatt: ' . $sheet->getTitle());
             }
             $width = filter_var(self::readCell($sheet, 2, 2), FILTER_VALIDATE_INT, [
                 'options' => ['min_range' => 1, 'max_range' => self::MAX_COLUMNS],
@@ -208,7 +213,7 @@ class PriceExcelCompactWorkbook
                     if ($price === null || trim((string) $price) === '') {
                         continue;
                     }
-                    $source = $sheet->getTitle().'!'.self::address($col, $row);
+                    $source = $sheet->getTitle().'!' . self::address($col, $row);
                     $encoded = (string) self::readCell($sheet, $col + $width, $row);
                     [$signature, $json] = array_pad(explode(':', $encoded, 2), 2, '');
                     if ($json === '' || ! hash_equals(hash_hmac('sha256', $json, (string) config('app.key')), $signature)) {
@@ -247,9 +252,9 @@ class PriceExcelCompactWorkbook
     {
         $min = rtrim(rtrim(number_format((float) $column[4], 3, ',', '.'), '0'), ',');
         $max = $column[5] === null ? null : rtrim(rtrim(number_format((float) $column[5], 3, ',', '.'), '0'), ',');
-        $range = $max === null ? 'ab '.$min : $min.'–'.$max;
+        $range = $max === null ? 'ab ' . $min : $min . '–' . $max;
 
-        return $range.($column[2] === 'staffel' ? ' ('.$column[3].')' : ' (manuell)');
+        return $range . ($column[2] === 'staffel' ? ' (' . $column[3] . ')' : ' (manuell)');
     }
 
     private static function sheetName(string $name, array &$names): string
@@ -260,8 +265,8 @@ class PriceExcelCompactWorkbook
         $name = $base;
         $i = 1;
         while (isset($names[mb_strtolower($name)])) {
-            $suffix = '-'.++$i;
-            $name = mb_substr($base, 0, 31 - mb_strlen($suffix)).$suffix;
+            $suffix = '-' . ++$i;
+            $name = mb_substr($base, 0, 31 - mb_strlen($suffix)) . $suffix;
         }
         $names[mb_strtolower($name)] = true;
 
@@ -270,7 +275,7 @@ class PriceExcelCompactWorkbook
 
     private static function address(int $column, int $row): string
     {
-        return Coordinate::stringFromColumnIndex($column).$row;
+        return Coordinate::stringFromColumnIndex($column) . $row;
     }
 
     private static function writeText(Worksheet $sheet, int $column, int $row, string $value): void
@@ -282,7 +287,7 @@ class PriceExcelCompactWorkbook
     {
         $cell = $sheet->getCell([$column, $row]);
         if ($cell->getDataType() === DataType::TYPE_FORMULA) {
-            self::reject($sheet->getTitle().'!'.self::address($column, $row).': Formeln sind nicht erlaubt.');
+            self::reject($sheet->getTitle().'!' . self::address($column, $row) . ': Formeln sind nicht erlaubt.');
         }
 
         return $cell->getValue();
