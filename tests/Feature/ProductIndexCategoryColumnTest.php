@@ -60,5 +60,5 @@ it('behält die korrekte Tabellenbreite ohne Produkte', function () {
     $this->actingAs(categoryColumnUser())
         ->get(route('products.index'))
         ->assertOk()
-        ->assertSee('<td colspan="8">', false);
+        ->assertSee('<td colspan="9">', false);
 });
