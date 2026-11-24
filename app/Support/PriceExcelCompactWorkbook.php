@@ -122,7 +122,7 @@ class PriceExcelCompactWorkbook
             $col = $index + 3;
             if ($previous !== $column[0]) {
                 if ($previous !== null && $col - 1 > $groupStart) {
-                    $sheet->mergeCells(self::address($groupStart, 1).':' . self::address($col - 1, 1));
+                    $sheet->mergeCells(self::address($groupStart, 1) . ':' . self::address($col - 1, 1));
                 }
                 $groupStart = $col;
                 $previous = $column[0];
@@ -130,14 +130,14 @@ class PriceExcelCompactWorkbook
                 self::writeText($sheet, $col, 1, (string) $column[1]);
             }
             self::writeText($sheet, $col, 2, self::rangeLabel($column));
-            $sheet->getStyle(self::address($col, 1).':' . self::address($col, 2))
+            $sheet->getStyle(self::address($col, 1) . ':' . self::address($col, 2))
                 ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($colors[$groupIndex % count($colors)]);
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col))->setWidth(25);
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $width))->setVisible(false);
             $index++;
         }
         if ($width + 2 > $groupStart) {
-            $sheet->mergeCells(self::address($groupStart, 1).':' . self::address($width + 2, 1));
+            $sheet->mergeCells(self::address($groupStart, 1) . ':' . self::address($width + 2, 1));
         }
 
         $sheet->getStyle('C3:' . self::address($width + 2, count($products) + 2))
@@ -213,7 +213,7 @@ class PriceExcelCompactWorkbook
                     if ($price === null || trim((string) $price) === '') {
                         continue;
                     }
-                    $source = $sheet->getTitle().'!' . self::address($col, $row);
+                    $source = $sheet->getTitle() . '!' . self::address($col, $row);
                     $encoded = (string) self::readCell($sheet, $col + $width, $row);
                     [$signature, $json] = array_pad(explode(':', $encoded, 2), 2, '');
                     if ($json === '' || ! hash_equals(hash_hmac('sha256', $json, (string) config('app.key')), $signature)) {
@@ -287,7 +287,7 @@ class PriceExcelCompactWorkbook
     {
         $cell = $sheet->getCell([$column, $row]);
         if ($cell->getDataType() === DataType::TYPE_FORMULA) {
-            self::reject($sheet->getTitle().'!' . self::address($column, $row) . ': Formeln sind nicht erlaubt.');
+            self::reject($sheet->getTitle() . '!' . self::address($column, $row) . ': Formeln sind nicht erlaubt.');
         }
 
         return $cell->getValue();
