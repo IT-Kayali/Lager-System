@@ -156,14 +156,29 @@
 
         table.items th:nth-child(1),
         table.items td:nth-child(1) {
-            width: 126mm;
-            text-align: left;
+            width: 14mm;
+            text-align: center;
         }
 
         table.items th:nth-child(2),
         table.items td:nth-child(2) {
+            width: 112mm;
+            text-align: left;
+        }
+
+        table.items th:nth-child(3),
+        table.items td:nth-child(3) {
             width: 58mm;
             text-align: center;
+        }
+
+        .batch-number {
+            font-size: 7pt;
+            line-height: 1.3;
+            color: #666;
+            font-weight: 400;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         /* Lagernotizen folgen der Artikeltabelle und werden vor dem Footer umgebrochen. */
@@ -253,11 +268,13 @@
 
     $formatQty = fn ($value): string => \App\Support\GermanNumber::format($value);
 
-    $items = $branchWithdrawal->items->values()->map(function ($item) use ($formatQty) {
+    $items = $branchWithdrawal->items->values()->map(function ($item, $index) use ($formatQty) {
         $unit = trim((string) ($item->product?->unit ?? ''));
         $qty = $formatQty($item->quantity);
 
         return (object) [
+            'position' => $index + 1,
+            'batch_number' => \App\Support\DeliveryNoteBatchNumber::latest($item->batch_allocations ?? []),
             'quantity' => trim($qty . ' ' . $unit),
             'description' => $item->product?->name ?? 'Gelöschtes Produkt',
         ];
@@ -320,6 +337,7 @@
                 <table class="items">
                     <thead>
                         <tr>
+                            <th>Pos.</th>
                             <th>Bezeichnung</th>
                             <th>Menge</th>
                         </tr>
@@ -327,7 +345,10 @@
                     <tbody>
                         @foreach ($page['items'] as $item)
                             <tr>
-                                <td>{{ $item->description }}</td>
+                                <td>{{ $item->position }}</td>
+                                <td>{{ $item->description }}@if ($item->batch_number !== null)
+                                    <div class="batch-number">Batch: {{ $item->batch_number }}</div>
+                                @endif</td>
                                 <td>{{ $item->quantity }}</td>
                             </tr>
                         @endforeach
