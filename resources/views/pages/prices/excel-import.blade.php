@@ -17,7 +17,7 @@
 
     <section class="premium-card erp-list-card">
         <h3>Preisdatei hochladen</h3>
-        <p class="premium-muted">Lade zuerst auf der Seite <a href="{{ route('prices.index') }}">Preise</a> eine aktuelle Vorlage für eine Kundengruppe oder alle Gruppen herunter. Trage nur in der Spalte <strong>price</strong> die gewünschten Werte ein.</p>
+        <p class="premium-muted">Lade zuerst auf der Seite <a href="{{ route('prices.index') }}">Preise</a> eine aktuelle Vorlage für eine Kundengruppe oder alle Gruppen herunter. Im Standardformat nur die Spalte <strong>price</strong>, im Kompaktformat nur die hellen Preisfelder bearbeiten. Beide Formate werden automatisch erkannt.</p>
         <p class="premium-muted">Leere Preiszellen werden ignoriert, 0 ist ein gültiger Preis. Bestehende Mengenregeln, nicht enthaltene Zeilen und andere Kundengruppen bleiben unverändert. Bei Produkten ohne manuelle Preisregel kann Excel eine neue Regel ab 1 Einheit anlegen.</p>
 
         <form method="POST" action="{{ route('prices.excel.import') }}" enctype="multipart/form-data">
@@ -42,7 +42,7 @@
             <p class="premium-muted">Es wurde noch nichts gespeichert. Markiere die Zeilen, die übernommen werden sollen. Die Vorschau gilt 30 Minuten.</p>
 
             @if (count($preview['rows']) === 0)
-                <div class="premium-placeholder">Keine Änderungen gefunden. Bitte die Spalte „price“ ausfüllen und erneut hochladen.</div>
+                <div class="premium-placeholder">Keine Änderungen gefunden. Bitte die Preisfelder ausfüllen und erneut hochladen.</div>
             @else
                 <form method="POST" id="erp-price-import-confirm" action="{{ route('prices.excel.import.confirm') }}" data-begin-url="{{ route('prices.excel.import.begin') }}" data-batch-url="{{ route('prices.excel.import.batch') }}" data-success-url="{{ route('prices.index') }}">
                     @csrf
@@ -52,7 +52,7 @@
                             <thead>
                                 <tr>
                                     <th>Übernehmen</th>
-                                    <th>Excel-Zeile</th>
+                                    <th>Excel-Zelle / Zeile</th>
                                     <th>Produkt</th>
                                     <th>Kundengruppe</th>
                                     <th>Preisbereich</th>
@@ -64,7 +64,7 @@
                                 @foreach ($preview['rows'] as $row)
                                     <tr>
                                         <td><input type="checkbox" class="erp-price-import-row" value="{{ $row['line'] }}" checked aria-label="Zeile {{ $row['line'] }} übernehmen"></td>
-                                        <td>{{ $row['line'] }}</td>
+                                        <td>{{ $row['source_cell'] ?? $row['line'] }}</td>
                                         <td>{{ $row['product'] }}</td>
                                         <td>{{ $row['group'] }}</td>
                                         <td>{{ $row['label'] }} ({{ $row['mode'] }})</td>
