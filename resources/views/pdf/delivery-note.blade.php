@@ -22,8 +22,8 @@
     $customerNumber=$customer->customer_number??$customer->number??('KD-'.str_pad((string)($customer->id??0),5,'0',STR_PAD_LEFT));$shippingMethod=$offer->shipping_method?:'—';
     $formatQty=fn($value):string=>\App\Support\GermanNumber::format($value);
     $unitLabels=['gram'=>'Gramm','liter'=>'Liter','piece'=>'Stück'];
-    $batchNumbers=$batchNumbers??[];
-    $items=$offer->items->values()->map(function($item,$index)use($formatQty,$unitLabels,$batchNumbers){$unit=trim((string)($item->product?->unit??''));$quantity=$formatQty($item->quantity);$product=$item->product_name??$item->description??($item->product?->name??'');return(object)['position'=>$index+1,'batch_number'=>$batchNumbers[$item->id]??null,'product'=>$product,'unit'=>$unit!==''?($unitLabels[$unit]??$unit):'—','quantity'=>$quantity];});
+    $batchNumbers=$batchNumbers??[];$batchProvisional=$batchProvisional??false;
+    $items=$offer->items->values()->map(function($item,$index)use($formatQty,$unitLabels,$batchNumbers,$batchProvisional){$unit=trim((string)($item->product?->unit??''));$quantity=$formatQty($item->quantity);$product=$item->product_name??$item->description??($item->product?->name??'');return(object)['position'=>$index+1,'batch_number'=>$batchNumbers[$item->id]??null,'batch_label'=>$batchProvisional?'Batch (voraussichtlich): ':'Batch: ','product'=>$product,'unit'=>$unit!==''?($unitLabels[$unit]??$unit):'—','quantity'=>$quantity];});
     $pages=\App\Support\DeliveryNoteLayout::paginate($items, (string)($offer->notes??''), trim((string)($customer?->delivery_note_instruction??''))!=='', true);$pageCount=$pages->count();
 @endphp
 @foreach($pages as $pageIndex=>$page)
@@ -31,7 +31,7 @@
 @if($page['first'])@if(!empty($logoDataUri))<img class="logo" src="{{ $logoDataUri }}" alt="">@endif<div class="sender-line">{{ $senderLine }}</div><div class="recipient">@foreach($recipientLines as $line){{ $line }}<br>@endforeach</div><div class="meta"><table><tr><td>Datum:</td><td>{{ now()->format('d.m.Y') }}</td></tr><tr><td>Kunden-Nr.:</td><td>{{ $customerNumber }}</td></tr><tr><td>Bestell-Nr.:</td><td>{{ $offer->offer_number }}</td></tr><tr><td>Versandart:</td><td>{{ $shippingMethod }}</td></tr></table></div><div class="title">Lieferschein</div><div class="intro">Sehr geehrte Damen und Herren,<br>vielen Dank für Ihre Bestellung. Wir liefern Ihnen wie vereinbart folgende Waren:</div>@endif
 <div class="items-wrap {{ $page['first']?'':'continuation' }}">
 @if($page['items']->isNotEmpty())
-<table class="items"><thead><tr><th>Pos.</th><th>Produkt</th><th>Menge</th><th>Einheit</th></tr></thead><tbody>@foreach($page['items'] as $item)<tr><td>{{ $item->position }}</td><td>{{ $item->product }}@if($item->batch_number !== null)<div class="batch-number">Batch: {{ $item->batch_number }}</div>@endif</td><td>{{ $item->quantity }}</td><td>{{ $item->unit }}</td></tr>@endforeach</tbody></table>
+<table class="items"><thead><tr><th style="width:8%;text-align:center">Pos.</th><th style="width:52%;text-align:left">Produkt</th><th style="width:22%;text-align:center">Menge</th><th style="width:18%;text-align:center">Einheit</th></tr></thead><tbody>@foreach($page['items'] as $item)<tr><td>{{ $item->position }}</td><td>{{ $item->product }}@if($item->batch_number !== null)<div class="batch-number">{{ $item->batch_label }}{{ $item->batch_number }}</div>@endif</td><td>{{ $item->quantity }}</td><td>{{ $item->unit }}</td></tr>@endforeach</tbody></table>
 @endif
 @if($page['note_lines'] !== [])
 <div class="offer-delivery-note-footer-note" style="margin-top:5mm;font-size:9.5pt;line-height:1.35;color:#111;overflow-wrap:break-word;word-wrap:break-word;">
