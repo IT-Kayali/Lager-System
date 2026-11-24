@@ -21,7 +21,7 @@ final class DeliveryNoteLayout
 
             if ($pages[$index]['used_mm'] + $header + $height > $pages[$index]['available_mm']) {
                 // Never place an oversized row across the ownership/footer zone.
-                if ($pages[$index]['items']->isEmpty()) {
+                if ($pages[$index]['items']->isEmpty() && ! $pages[$index]['first']) {
                     throw new \RuntimeException('Produktposition ist für eine einzelne Lieferscheinseite zu lang.');
                 }
                 $pages[] = self::blankPage(false, $hasCustomerInstruction, $branded);
@@ -88,11 +88,19 @@ final class DeliveryNoteLayout
         $unit = (string) ($item->unit ?? '');
         $productLines = 0;
         foreach (preg_split('/\R/u', $product) ?: [''] as $line) {
-            $productLines += max(1, (int) ceil(mb_strwidth($line, 'UTF-8') / 39));
+            $productLines += max(1, (int) ceil(mb_strwidth($line, 'UTF-8') / 22));
         }
         $lines = max($productLines, (int) ceil(mb_strwidth($quantity, 'UTF-8') / 14), (int) ceil(mb_strwidth($unit, 'UTF-8') / 11), 1);
         // Conservative estimate: padding + line-height + safety margin.
-        return 10.0 + (($lines - 1) * 6.1);
+        $batch = trim((string) ($item->batch_number ?? ''));
+        $batchHeight = 0.0;
+        if ($batch !== '') {
+            foreach (preg_split('/\R/u', 'Batch: ' . $batch) ?: [''] as $line) {
+                $batchHeight += max(1, (int) ceil(mb_strwidth($line, 'UTF-8') / 28)) * 4.0;
+            }
+        }
+
+        return 10.0 + (($lines - 1) * 6.1) + $batchHeight;
     }
 
     private static function wrapNote(string $note, int $width): array
