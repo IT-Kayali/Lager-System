@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\DocumentTemplate;
 use App\Models\Offer;
 use App\Services\DocumentItemSorter;
+use App\Support\DeliveryNoteBatchNumber;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
 use InvalidArgumentException;
@@ -34,6 +35,7 @@ class OfferPdfController extends Controller
         ActivityLog::record($activityEvents[$type], $offer, ['offer_number' => $offer->offer_number, 'template' => $template->name]);
         $viewData = compact('offer', 'template', 'title', 'logoDataUri', 'backgroundDataUri') + ['documentType' => $type];
         if ($type === 'delivery-note') {
+            $viewData['batchNumbers'] = DeliveryNoteBatchNumber::forOffer($offer);
             $html = view($pdfView, $viewData)->render();
             $html = $this->injectCartonCountIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
             $html = $this->injectCustomerDeliveryInstructionIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
@@ -178,57 +180,121 @@ class OfferPdfController extends Controller
         $unitLocale = $isNoLogoPdfTemplate ? 'en' : 'de';
         $units = $offer->items->values()->map(fn ($item): string => $item->product?->unitLabel($unitLocale) ?? '—')->all();
         $hasShippingRow = (($offer->shipping_method ?? null) === 'Lieferung' && (float) ($offer->shipping_price_gross ?? 0) > 0);
-        if ($hasShippingRow) $units[] = '—';
-        $dom = new \DOMDocument('1.0', 'UTF-8'); $previousLibxmlState = libxml_use_internal_errors(true);
-        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD); libxml_clear_errors(); libxml_use_internal_errors($previousLibxmlState);
-        if (! $loaded) return $html;
-        $xpath = new \DOMXPath($dom); $tables = $xpath->query('//table[contains(concat(" ", normalize-space(@class), " "), " items-table ") or contains(concat(" ", normalize-space(@class), " "), " items ")]');
-        if ($tables === false || $tables->length === 0) return $html;
-        $productLabel = $isNoLogoPdfTemplate ? 'PRODUCT' : 'Produkt'; $quantityLabel = $isNoLogoPdfTemplate ? 'QUANTITY' : 'Menge'; $unitLabel = $isNoLogoPdfTemplate ? 'UNIT' : 'Einheit'; $priceLabel = $isNoLogoPdfTemplate ? 'PRICE' : 'Preis'; $totalLabel = $isNoLogoPdfTemplate ? 'TOTAL' : 'Summe'; $unitIndex = 0; $productRowCount = $offer->items->count();
+        if ($hasShippingRow) {
+            $units[] = '—';
+        }
+
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $previousLibxmlState = libxml_use_internal_errors(true);
+        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousLibxmlState);
+        if (! $loaded) {
+            return $html;
+        }
+
+        $xpath = new \DOMXPath($dom);
+        $tables = $xpath->query('//table[contains(concat(" ", normalize-space(@class), " "), " items-table ") or contains(concat(" ", normalize-space(@class), " "), " items ")]');
+        if ($tables === false || $tables->length === 0) {
+            return $html;
+        }
+
+        $productLabel = $isNoLogoPdfTemplate ? 'PRODUCT' : 'Produkt';
+        $quantityLabel = $isNoLogoPdfTemplate ? 'QUANTITY' : 'Menge';
+        $unitLabel = $isNoLogoPdfTemplate ? 'UNIT' : 'Einheit';
+        $priceLabel = $isNoLogoPdfTemplate ? 'PRICE' : 'Preis';
+        $totalLabel = $isNoLogoPdfTemplate ? 'TOTAL' : 'Summe';
+        $unitIndex = 0;
+        $productRowCount = $offer->items->count();
+
         foreach ($tables as $table) {
-            if (! $table instanceof \DOMElement) continue;
+            if (! $table instanceof \DOMElement) {
+                continue;
+            }
+
+            $headers = $xpath->query('./thead/tr[1]/th', $table);
+            if ($headers === false || $headers->length !== 4) {
+                continue;
+            }
+
             $table->setAttribute('class', trim($table->getAttribute('class') . ' document-unit-table'));
-            $headerNodes = []; $headers = $xpath->query('.//thead/tr[1]/th', $table); if ($headers !== false) foreach ($headers as $header) $headerNodes[] = $header;
-            if (count($headerNodes) >= 4) { $headerNodes[0]->nodeValue = $productLabel; $headerNodes[1]->nodeValue = $quantityLabel; $headerNodes[2]->nodeValue = $priceLabel; $headerNodes[3]->nodeValue = $totalLabel; $unitHeader = $dom->createElement('th'); $unitHeader->appendChild($dom->createTextNode($unitLabel)); $headerNodes[2]->parentNode?->insertBefore($unitHeader, $headerNodes[2]); }
-            $rows = $xpath->query('.//tbody/tr', $table); if ($rows === false) continue;
+            $headerNodes = iterator_to_array($headers);
+            foreach ([$productLabel, $quantityLabel, $priceLabel, $totalLabel] as $index => $label) {
+                $headerNodes[$index]->textContent = $label;
+            }
+            $positionHeader = $dom->createElement('th');
+            $positionHeader->appendChild($dom->createTextNode('Pos.'));
+            $headerNodes[0]->parentNode?->insertBefore($positionHeader, $headerNodes[0]);
+
+            $unitHeader = $dom->createElement('th');
+            $unitHeader->appendChild($dom->createTextNode($unitLabel));
+            $headerNodes[2]->parentNode?->insertBefore($unitHeader, $headerNodes[2]);
+
+            $rows = $xpath->query('./tbody/tr', $table);
+            if ($rows === false) {
+                continue;
+            }
+
             foreach ($rows as $row) {
-                if (! $row instanceof \DOMElement) continue; $cells = [];
-                foreach ($row->childNodes as $child) if ($child instanceof \DOMElement && strtolower($child->tagName) === 'td') $cells[] = $child;
-                if (count($cells) < 4) continue;
-                $rowClasses = ' ' . preg_replace('/\s+/', ' ', trim($row->getAttribute('class'))) . ' '; $isEmptyRow = str_contains($rowClasses, ' empty-product-row '); $isShippingRow = ! $isEmptyRow && $hasShippingRow && $unitIndex >= $productRowCount; $unit = $isEmptyRow ? "\u{00A0}" : ($units[$unitIndex] ?? '—');
-                if ($isShippingRow) $cells[1]->nodeValue = '—'; if (! $isEmptyRow) $unitIndex++;
-                $unitCell = $dom->createElement('td'); $unitCell->appendChild($dom->createTextNode($unit)); $cells[2]->parentNode?->insertBefore($unitCell, $cells[2]);
+                $cells = $xpath->query('./td', $row);
+                if ($cells === false || $cells->length !== 4) {
+                    continue;
+                }
+                $cells = iterator_to_array($cells);
+
+                $rowClasses = ' ' . preg_replace('/\s+/', ' ', trim($row->getAttribute('class'))) . ' ';
+                $isEmptyRow = str_contains($rowClasses, ' empty-product-row ');
+                $isShippingRow = ! $isEmptyRow && $hasShippingRow && $unitIndex >= $productRowCount;
+                $unit = $isEmptyRow ? "\u{00A0}" : ($units[$unitIndex] ?? '—');
+                $position = ! $isEmptyRow && $unitIndex < $productRowCount ? (string) ($unitIndex + 1) : "\u{00A0}";
+
+                if ($isShippingRow) {
+                    $cells[1]->textContent = '—';
+                }
+                if (! $isEmptyRow) {
+                    $unitIndex++;
+                }
+
+                $positionCell = $dom->createElement('td');
+                $positionCell->appendChild($dom->createTextNode($position));
+                $row->insertBefore($positionCell, $cells[0]);
+
+                $unitCell = $dom->createElement('td');
+                $unitCell->appendChild($dom->createTextNode($unit));
+                $row->insertBefore($unitCell, $cells[2]);
             }
         }
-        $head = $dom->getElementsByTagName('head')->item(0); if ($head instanceof \DOMElement) { $style = $dom->createElement('style'); $style->setAttribute('id', 'document-unit-column-styles'); $style->appendChild($dom->createTextNode($isNoLogoPdfTemplate ? $this->noLogoDocumentUnitColumnCss() : $this->logoDocumentUnitColumnCss())); $head->appendChild($style); }
-        $rendered = $dom->saveHTML(); if (! is_string($rendered)) return $html; return (string) preg_replace('/^<\?xml encoding="UTF-8"\?>\s*/i', '', $rendered);
+
+        $head = $dom->getElementsByTagName('head')->item(0);
+        if ($head instanceof \DOMElement) {
+            $style = $dom->createElement('style');
+            $style->setAttribute('id', 'document-unit-column-styles');
+            $style->appendChild($dom->createTextNode($this->documentPositionColumnCss($isNoLogoPdfTemplate)));
+            $head->appendChild($style);
+        }
+
+        $rendered = $dom->saveHTML();
+        if (! is_string($rendered)) {
+            return $html;
+        }
+
+        return (string) preg_replace('/^<\?xml encoding="UTF-8"\?>\s*/i', '', $rendered);
     }
 
-    private function logoDocumentUnitColumnCss(): string { return <<<'CSS'
-.items-table.document-unit-table th:nth-child(1),
-.items-table.document-unit-table td:nth-child(1) { width: 20% !important; text-align: left !important; }
-.items-table.document-unit-table th:nth-child(2),
-.items-table.document-unit-table td:nth-child(2) { width: 20% !important; text-align: center !important; }
-.items-table.document-unit-table th:nth-child(3),
-.items-table.document-unit-table td:nth-child(3) { width: 20% !important; text-align: center !important; }
-.items-table.document-unit-table th:nth-child(4),
-.items-table.document-unit-table td:nth-child(4) { width: 20% !important; text-align: right !important; }
-.items-table.document-unit-table th:nth-child(5),
-.items-table.document-unit-table td:nth-child(5) { width: 20% !important; text-align: right !important; }
-CSS;
-    }
-    private function noLogoDocumentUnitColumnCss(): string { return <<<'CSS'
-table.items.document-unit-table th:nth-child(1),
-table.items.document-unit-table td:nth-child(1) { width: 20% !important; text-align: left !important; }
-table.items.document-unit-table th:nth-child(2),
-table.items.document-unit-table td:nth-child(2) { width: 20% !important; text-align: center !important; }
-table.items.document-unit-table th:nth-child(3),
-table.items.document-unit-table td:nth-child(3) { width: 20% !important; text-align: center !important; }
-table.items.document-unit-table th:nth-child(4),
-table.items.document-unit-table td:nth-child(4) { width: 20% !important; text-align: right !important; }
-table.items.document-unit-table th:nth-child(5),
-table.items.document-unit-table td:nth-child(5) { width: 20% !important; text-align: right !important; }
-CSS;
+    private function documentPositionColumnCss(bool $withoutLogo): string
+    {
+        $table = $withoutLogo ? 'table.items.document-unit-table' : '.items-table.document-unit-table';
+        $widths = [7, 29, 16, 14, 17, 17];
+        $alignments = ['center', 'left', 'center', 'center', 'right', 'right'];
+        $css = $table . ' th, ' . $table . ' td { overflow-wrap: break-word; word-wrap: break-word; }' . "\n";
+
+        foreach ($widths as $index => $width) {
+            $column = $index + 1;
+            $alignment = $alignments[$index];
+            $css .= "{$table} th:nth-child({$column}), {$table} td:nth-child({$column}) { width: {$width}% !important; text-align: {$alignment} !important; }\n";
+        }
+
+        return $css;
     }
 
     private function publicStorageDataUri(?string $relativePath): ?string
