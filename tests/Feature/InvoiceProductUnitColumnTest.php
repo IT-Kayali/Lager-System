@@ -162,10 +162,10 @@ it('numbers product positions continuously across pages without numbering shippi
     $second = '<table class="items-table"><thead><tr><th>Produkt</th><th>Menge</th><th>Preis</th><th>Summe</th></tr></thead><tbody>'
         . '<tr><td>B</td><td>2</td><td>10</td><td>20</td></tr>'
         . '<tr><td>Versand</td><td>1</td><td>6</td><td>6</td></tr></tbody></table>';
-    $html = transformOfferDocumentTable(documentWithUnits(['gram', 'piece'], true), false, '<html><head></head><body>' . $first . $second . '</body></html>');
+    $html = transformOfferDocumentTable(documentWithUnits(['gram', 'piece'], true), false, '<html><head><meta charset="UTF-8"></head><body>' . $first . $second . '</body></html>');
 
     $dom = new DOMDocument;
-    $dom->loadHTML($html);
+    $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
     $xpath = new DOMXPath($dom);
     $positions = [];
     foreach ($xpath->query('//table/tbody/tr/td[1]') as $cell) {
