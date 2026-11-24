@@ -192,3 +192,54 @@ it('keeps the existing PDF role access and streams notes for warehouse staff', f
         ->get(route('branch-withdrawals.delivery-note', $withdrawal))
         ->assertForbidden();
 });
+
+it('shows only the newest assigned batch beneath the product and includes a position column', function () {
+    $manager = User::factory()->create(['role' => User::ROLE_MANAGER, 'is_active' => true]);
+    $this->actingAs($manager);
+
+    $withdrawal = branchNotePdfWithdrawal('Ware prüfen.');
+    $withdrawal->items()->firstOrFail()->update([
+        'batch_allocations' => [
+            ['batch_id' => 99, 'batch_number' => 'OLD-BATCH', 'received_at' => '2026-01-01', 'quantity' => 1],
+            ['batch_id' => 2, 'batch_number' => 'NEW-BATCH', 'received_at' => '2026-02-01', 'quantity' => 1.5],
+            ['batch_id' => 100, 'batch_number' => 'UNUSED-BATCH', 'received_at' => '2026-03-01', 'quantity' => 0],
+        ],
+    ]);
+
+    $html = branchNotePdfHtml($withdrawal->fresh('items.product'));
+    expect($html)
+        ->toContain('<th>Pos.</th>')
+        ->toContain('<td>1</td>')
+        ->toContain('class="batch-number">Batch: NEW-BATCH')
+        ->not->toContain('OLD-BATCH')
+        ->not->toContain('UNUSED-BATCH');
+});
+
+it('reserves additional page space for batch lines without resetting positions', function () {
+    $items = collect(range(1, 25))->map(fn (int $position) => (object) [
+        'position' => $position,
+        'description' => 'Produkt ' . $position,
+        'quantity' => '12 gram',
+        'batch_number' => str_repeat('W', 72),
+    ]);
+
+    $pages = BranchWithdrawalDeliveryNoteLayout::paginate($items, 'Lagernotiz');
+    expect($pages->count())->toBeGreaterThan(1)
+        ->and($pages->flatMap(fn (array $page) => $page['items'])->pluck('position')->all())->toBe(range(1, 25));
+
+    foreach ($pages as $page) {
+        expect($page['used_mm'])->toBeLessThanOrEqual($page['available_mm']);
+    }
+});
+
+it('selects assigned batches by receipt date and uses the ID only to break ties', function () {
+    $allocations = [
+        ['batch_id' => 100, 'batch_number' => 'OLD', 'received_at' => '2026-01-01', 'quantity' => 1],
+        ['batch_id' => 2, 'batch_number' => 'TIE-OLDER', 'received_at' => '2026-02-01', 'quantity' => 1],
+        ['batch_id' => 3, 'batch_number' => 'TIE-NEWEST', 'received_at' => '2026-02-01', 'quantity' => 1],
+        ['batch_id' => 4, 'batch_number' => 'NOT-USED', 'received_at' => '2026-03-01', 'quantity' => 0],
+    ];
+
+    expect(\App\Support\DeliveryNoteBatchNumber::latest($allocations))->toBe('TIE-NEWEST')
+        ->and(\App\Support\DeliveryNoteBatchNumber::latest([]))->toBeNull();
+});
