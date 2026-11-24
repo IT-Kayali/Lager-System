@@ -641,3 +641,121 @@ it('zeigt und speichert manuelle Stückpreise mit fünf Dezimalstellen', functio
         ->where('customer_group_id', $group->id)
         ->firstOrFail()->price)->toBe('17.34567');
 });
+
+function erp111Compact(Tests\TestCase $test, string $group = 'all', bool $template = true): Spreadsheet
+{
+    $route = $template ? 'prices.excel.template' : 'prices.excel.export';
+    $response = $test->get(route($route, ['customer_group_id' => $group, 'format' => 'compact']))->assertOk();
+    $path = $response->baseResponse->getFile()->getPathname();
+
+    try {
+        return IOFactory::load($path);
+    } finally {
+        @unlink($path);
+    }
+}
+
+it('creates compact sheets for each used unit and sorts products and quantities naturally', function () {
+    $group = erp11Group('Matrix Gold');
+    $ten = erp11Product('10');
+    $two = erp11Product('2');
+    erp11Product('3A');
+    $category = ProductCategory::query()->create(['name' => 'Matrix manuell', 'price_tiers_enabled' => false]);
+    $piece = Product::query()->create(['name' => 'Flakon', 'unit' => 'piece', 'minimum_stock' => 0]);
+    $piece->categories()->attach($category->id);
+    $liter = Product::query()->create(['name' => 'Flüssigkeit', 'unit' => 'liter', 'minimum_stock' => 0]);
+    $liter->categories()->attach($category->id);
+
+    foreach ([10, 1] as $min) {
+        ManualPriceRule::query()->create([
+            'product_id' => $piece->id,
+            'customer_group_id' => $group->id,
+            'min_quantity' => $min,
+            'max_quantity' => $min === 1 ? 9 : null,
+            'price' => '2.12345',
+        ]);
+    }
+    $ten->priceTiers()->where('customer_group_id', $group->id)->firstOrFail()->update(['price' => '1.23456']);
+    $this->actingAs(erp11Manager());
+
+    $book = erp111Compact($this, (string) $group->id, false);
+    try {
+        expect($book->getSheetNames())->toContain('Gramm', 'Stück', 'Liter', 'Anleitung')
+            ->and($book->getSheetByName('Gramm')->getCell('A3')->getValue())->toBe('2')
+            ->and($book->getSheetByName('Gramm')->getCell('A4')->getValue())->toBe('3A')
+            ->and($book->getSheetByName('Gramm')->getCell('A5')->getValue())->toBe('10')
+            ->and($book->getSheetByName('Stück')->getCell('C2')->getValue())->toBe('1–9 (manuell)')
+            ->and($book->getSheetByName('Stück')->getCell('D2')->getValue())->toBe('ab 10 (manuell)')
+            ->and((float) $book->getSheetByName('Stück')->getCell('C3')->getValue())->toBe(2.12345)
+            ->and($book->getSheetByName('Stück')->getStyle('C3')->getNumberFormat()->getFormatCode())->toBe('0.00000')
+            ->and($book->getSheetByName('Stück')->getColumnDimension('B')->getVisible())->toBeFalse()
+            ->and($book->getSheetByName('Liter')->getCell('C3')->getValue())->toBeNull();
+    } finally {
+        $book->disconnectWorksheets();
+    }
+});
+
+it('imports multiple compact unit sheets through the same preview and confirmation', function () {
+    $group = erp11Group('Matrix Import');
+    $gram = erp11Product('Matrix Duft');
+    $tier = $gram->priceTiers()->where('customer_group_id', $group->id)->orderBy('min_grams')->firstOrFail();
+    $category = ProductCategory::query()->create(['name' => 'Matrix Stück', 'price_tiers_enabled' => false]);
+    $piece = Product::query()->create(['name' => 'Matrix Flakon', 'unit' => 'piece', 'minimum_stock' => 0]);
+    $piece->categories()->attach($category->id);
+    $this->actingAs(erp11Manager());
+
+    $book = erp111Compact($this, (string) $group->id);
+    $book->getSheetByName('Gramm')->setCellValue('C3', '12,34567');
+    $book->getSheetByName('Stück')->setCellValue('C3', 0.00001);
+    $upload = erp11Upload($book);
+    try {
+        $preview = $this->post(route('prices.excel.import'), [
+            'excel_file' => $upload,
+            'customer_group_id' => (string) $group->id,
+        ])->assertOk();
+
+        $rows = $preview->viewData('preview')['rows'];
+        expect($rows)->toHaveCount(2)
+            ->and(array_column($rows, 'source_cell'))->toContain('Gramm!C3', 'Stück!C3')
+            ->and((string) $tier->fresh()->price)->toBe('0.00000')
+            ->and(ManualPriceRule::query()->where('product_id', $piece->id)->count())->toBe(0);
+
+        $this->post(route('prices.excel.import.confirm'), [
+            'preview_token' => $preview->viewData('previewToken'),
+            'selected_rows' => array_column($rows, 'line'),
+        ])->assertRedirect(route('prices.index'));
+
+        expect((string) $tier->fresh()->price)->toBe('12.34567')
+            ->and((string) ManualPriceRule::query()->where('product_id', $piece->id)->firstOrFail()->price)->toBe('0.00001');
+    } finally {
+        @unlink($upload->getRealPath());
+    }
+});
+
+it('rejects changed compact headers, formulas and missing signed price assignments', function () {
+    $group = erp11Group('Matrix Schutz');
+    $product = erp11Product('Matrix Produkt');
+    $this->actingAs(erp11Manager());
+
+    foreach (['header', 'formula', 'mapping'] as $case) {
+        $book = erp111Compact($this, (string) $group->id);
+        $sheet = $book->getSheetByName('Gramm');
+        $sheet->setCellValue('C3', $case === 'formula' ? '=1+1' : 1.23456);
+        if ($case === 'header') {
+            $sheet->setCellValue('C2', 'anderer Mengenbereich');
+        } elseif ($case === 'mapping') {
+            $width = (int) $sheet->getCell('B2')->getValue();
+            $sheet->setCellValue([$width + 3, 3], 'invalid');
+        }
+        $upload = erp11Upload($book);
+        try {
+            $this->post(route('prices.excel.import'), [
+                'excel_file' => $upload,
+                'customer_group_id' => (string) $group->id,
+            ])->assertSessionHasErrors('excel_file');
+        } finally {
+            @unlink($upload->getRealPath());
+        }
+    }
+    expect((string) $product->priceTiers()->where('customer_group_id', $group->id)->firstOrFail()->price)->toBe('0.00000');
+});

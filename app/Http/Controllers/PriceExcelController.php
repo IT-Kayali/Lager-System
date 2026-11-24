@@ -6,6 +6,7 @@ use App\Models\CustomerGroup;
 use App\Models\ManualPriceRule;
 use App\Models\Product;
 use App\Models\ProductPriceTier;
+use App\Support\PriceExcelCompactWorkbook;
 use App\Support\PriceExcelImportPlan;
 use App\Support\PriceExcelStreamWriter;
 use Illuminate\Http\JsonResponse;
@@ -39,10 +40,13 @@ class PriceExcelController extends Controller
             ->ordered()
             ->get();
 
-        // Maximal 50 Produkte sowie deren aktuelle Preise gleichzeitig laden.
-        // Der XLSX-Schreiber schreibt XML auf die Festplatte statt alle Zellen
-        // als PhpSpreadsheet-Objekte im Arbeitsspeicher zu halten.
-        $writer = new PriceExcelStreamWriter();
+        // Preise paketweise laden. Das Standardformat bleibt ein Streaming-Export;
+        // die kompakte Matrix hat eigene Größenlimits.
+        $format = $request->validate(['format' => ['nullable', 'in:standard,compact']])['format'] ?? 'standard';
+        $compact = $format === 'compact';
+        $writer = $compact
+            ? new PriceExcelCompactWorkbook(array_flip($groups->pluck('id')->all()))
+            : new PriceExcelStreamWriter();
 
         Product::query()
             ->active()
@@ -66,6 +70,13 @@ class PriceExcelController extends Controller
                     ->groupBy(fn ($rule) => $rule->product_id . ':' . $rule->customer_group_id);
 
                 foreach ($products as $product) {
+                    $append = function (array $values) use ($writer, $product): void {
+                        if ($writer instanceof PriceExcelCompactWorkbook) {
+                            $writer->append($values, (string) $product->unit);
+                        } else {
+                            $writer->append($values);
+                        }
+                    };
                     $mode = $product->usesPriceTiers() ? 'staffel' : 'manuell';
 
                     foreach ($groups as $group) {
@@ -77,7 +88,7 @@ class PriceExcelController extends Controller
                         // Ohne vorhandene manuelle Regel eine ausfüllbare Standardzeile
                         // anbieten. Sie wird nur bei ausdruecklicher Preisangabe erstellt.
                         if ($mode === 'manuell' && $rules->isEmpty()) {
-                            $writer->append([
+                            $append([
                                 $product->name, $group->name, 'manuell', '',
                                 1, null, $product->unitLabel('de'), null,
                                 'ab 1 ' . $product->unitLabel('de'),
@@ -86,7 +97,7 @@ class PriceExcelController extends Controller
                         }
 
                         foreach ($rules as $rule) {
-                            $writer->append([
+                            $append([
                                 $product->name,
                                 $group->name,
                                 $mode,
@@ -109,7 +120,7 @@ class PriceExcelController extends Controller
         $writer->finish($path);
 
         $suffix = $groupId === null ? 'alle-gruppen' : 'gruppe-' . $groupId;
-        $name = $template ? 'preisvorlage-' : 'preise-';
+        $name = ($template ? 'preisvorlage-' : 'preise-') . ($compact ? 'kompakt-' : '');
 
         return response()->download($path, $name . $suffix . '.xlsx')->deleteFileAfterSend(true);
     }
@@ -132,15 +143,44 @@ class PriceExcelController extends Controller
         $service->groupId($scope);
 
         try {
-            // Nur das benoetigte Preisblatt ohne Formatobjekte laden.
-            // Das Anleitung-Blatt wird fuer die Vorschau nicht gebraucht.
+            // Nur Preisblätter ohne Formatobjekte laden; Anleitung überspringen.
             $path = $data['excel_file']->getRealPath();
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(true);
-            $reader->setLoadSheetsOnly(['Preise']);
+            $names = $reader->listWorksheetNames($path);
+            $compact = ! in_array('Preise', $names, true) && in_array('Anleitung', $names, true);
+            if ($compact) {
+                $sheets = array_values(array_diff($names, ['Anleitung']));
+                $cells = 0;
+                foreach ($reader->listWorksheetInfo($path) as $info) {
+                    if (in_array($info['worksheetName'], $sheets, true)) {
+                        $cells += $info['totalRows'] * $info['totalColumns'];
+                    }
+                }
+                if ($sheets === [] || $cells > 210000 || count($sheets) > 100) {
+                    throw ValidationException::withMessages(['excel_file' => 'Die kompakte Preisdatei ist zu groß. Bitte eine einzelne Kundengruppe exportieren.']);
+                }
+                $reader->setLoadSheetsOnly($sheets);
+            } else {
+                $reader->setLoadSheetsOnly(['Preise']);
+            }
             $spreadsheet = $reader->load($path);
             try {
-                $preview = $service->prepare($spreadsheet, $scope);
+                if ($compact) {
+                    [$rows, $sources] = PriceExcelCompactWorkbook::readRows($spreadsheet);
+                    $spreadsheet->disconnectWorksheets();
+                    $preview = $service->prepareCells(
+                        count($rows) + 1,
+                        fn (int $column, int $line) => $rows[$line - 2][$column - 1],
+                        $scope
+                    );
+                    foreach ($preview['rows'] as &$row) {
+                        $row['source_cell'] = $sources[$row['line']];
+                    }
+                    unset($row);
+                } else {
+                    $preview = $service->prepare($spreadsheet, $scope);
+                }
             } finally {
                 $spreadsheet->disconnectWorksheets();
             }

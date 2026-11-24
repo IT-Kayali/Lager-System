@@ -22,7 +22,7 @@ class PriceExcelImportPlan
 
     public function prepare(Spreadsheet $spreadsheet, string $scope): array
     {
-        $groupId = $this->groupId($scope);
+        $this->groupId($scope);
         $sheet = $spreadsheet->getSheetByName('Preise');
 
         if ($sheet === null) {
@@ -41,6 +41,27 @@ class PriceExcelImportPlan
             }
         }
 
+        return $this->prepareCells($lastRow, function (int $column, int $line) use ($sheet): mixed {
+            $cell = $sheet->getCell([$column, $line]);
+            if ($cell->getDataType() === DataType::TYPE_FORMULA) {
+                $this->reject("Zeile {$line}: Formeln sind aus Sicherheitsgründen nicht erlaubt.");
+            }
+
+            return $cell->getValue();
+        }, $scope);
+    }
+
+    /**
+     * Both workbook formats use the same identity checks, price validation
+     * and preview; line numbers remain unique for the existing batch API.
+     */
+    public function prepareCells(int $lastRow, callable $readCell, string $scope): array
+    {
+        $groupId = $this->groupId($scope);
+        if ($lastRow > 50001) {
+            $this->reject('Es sind maximal 50.000 Preiszeilen pro Import erlaubt.');
+        }
+
         $rows = [];
         $seen = [];
 
@@ -54,14 +75,14 @@ class PriceExcelImportPlan
                 $chunkEnd = min($line + 249, $lastRow);
 
                 for ($candidateLine = $line; $candidateLine <= $chunkEnd; $candidateLine++) {
-                    $price = $sheet->getCell([8, $candidateLine])->getValue();
+                    $price = $readCell(8, $candidateLine);
                     if ($price === null || trim((string) $price) === '') {
                         continue;
                     }
 
-                    $candidateMode = trim((string) $sheet->getCell([3, $candidateLine])->getValue());
+                    $candidateMode = trim((string) $readCell(3, $candidateLine));
                     $candidateId = filter_var(
-                        $sheet->getCell([12, $candidateLine])->getValue(),
+                        $readCell(12, $candidateLine),
                         FILTER_VALIDATE_INT,
                         ['options' => ['min_range' => 1]]
                     );
@@ -83,11 +104,7 @@ class PriceExcelImportPlan
             }
             $values = [];
             foreach (self::HEADERS as $index => $header) {
-                $cell = $sheet->getCell([$index + 1, $line]);
-                if ($cell->getDataType() === DataType::TYPE_FORMULA) {
-                    $this->reject("Zeile {$line}: Formeln sind aus Sicherheitsgründen nicht erlaubt.");
-                }
-                $values[$header] = $cell->getValue();
+                $values[$header] = $readCell($index + 1, $line);
             }
 
             // Leere Preise sind ausdrücklich kein Lösch- oder Nullsetz-Befehl.
