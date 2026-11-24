@@ -83,7 +83,7 @@ function noLogoDocumentTableHtml(bool $withShipping = false): string
 HTML;
 }
 
-it('uses five equally wide columns with german labels', function () {
+it('uses six columns including position and unit with german labels', function () {
     $html = transformOfferDocumentTable(documentWithUnits(['g']), false, logoDocumentTableHtml(true));
     $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
@@ -96,7 +96,7 @@ it('uses five equally wide columns with german labels', function () {
         ->toContain('>g<')
         ->toContain('document-unit-table');
 
-    expect(substr_count($decoded, 'width: 20% !important'))->toBe(5);
+    expect($decoded)->toContain('width: 7% !important')->toContain('>Pos.<')->toContain('<td>1</td>');
 
     expect(strpos($decoded, '>Produkt<'))
         ->toBeLessThan(strpos($decoded, '>Menge<'));
@@ -108,10 +108,10 @@ it('uses five equally wide columns with german labels', function () {
         ->toBeLessThan(strpos($decoded, '>Summe<'));
 
     preg_match('/<tr class="empty-product-row">(.*?)<\/tr>/s', $decoded, $emptyRow);
-    expect(substr_count($emptyRow[1] ?? '', '<td>'))->toBe(5);
+    expect(substr_count($emptyRow[1] ?? '', '<td>'))->toBe(6);
 });
 
-it('uses five equally wide columns with english labels without logo', function () {
+it('uses six columns including position and unit with english labels without logo', function () {
     $html = transformOfferDocumentTable(documentWithUnits(['Stk']), true, noLogoDocumentTableHtml());
     $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
@@ -124,7 +124,7 @@ it('uses five equally wide columns with english labels without logo', function (
         ->toContain('>Stk<')
         ->toContain('document-unit-table');
 
-    expect(substr_count($decoded, 'width: 20% !important'))->toBe(5);
+    expect($decoded)->toContain('width: 7% !important')->toContain('>Pos.<')->toContain('<td>1</td>');
 
     expect(strpos($decoded, '>PRODUCT<'))
         ->toBeLessThan(strpos($decoded, '>QUANTITY<'));
@@ -152,4 +152,26 @@ it('uses the same unit column transformation for offer and invoice pdfs', functi
         ->toContain("if (\$type === 'delivery-note') {")
         ->toContain("\$html = \$this->injectProductUnitColumnIntoOfferDocument(\$html, \$offer, \$isNoLogoPdfTemplate);")
         ->not->toContain("elseif (\$type === 'invoice')");
+});
+
+
+it('numbers product positions continuously across pages without numbering shipping or padding', function () {
+    $first = '<table class="items-table"><thead><tr><th>Produkt</th><th>Menge</th><th>Preis</th><th>Summe</th></tr></thead><tbody>'
+        . '<tr><td>A</td><td>1</td><td>10</td><td>10</td></tr>'
+        . '<tr class="empty-product-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table>';
+    $second = '<table class="items-table"><thead><tr><th>Produkt</th><th>Menge</th><th>Preis</th><th>Summe</th></tr></thead><tbody>'
+        . '<tr><td>B</td><td>2</td><td>10</td><td>20</td></tr>'
+        . '<tr><td>Versand</td><td>1</td><td>6</td><td>6</td></tr></tbody></table>';
+    $html = transformOfferDocumentTable(documentWithUnits(['gram', 'piece'], true), false, '<html><head></head><body>' . $first . $second . '</body></html>');
+
+    $dom = new DOMDocument;
+    $dom->loadHTML($html);
+    $xpath = new DOMXPath($dom);
+    $positions = [];
+    foreach ($xpath->query('//table/tbody/tr/td[1]') as $cell) {
+        $positions[] = str_replace("\u{00A0}", '', $cell->textContent);
+    }
+
+    expect($positions)->toBe(['1', '', '2', ''])
+        ->and($xpath->query('//table/thead/tr/th[1]')->length)->toBe(2);
 });
