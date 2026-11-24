@@ -72,7 +72,7 @@ it('prints the newest consumed FIFO batch on both customer delivery templates an
         ])->render();
 
         expect($html)
-            ->toContain('<th>Pos.</th>')
+            ->toContain('<th style="width:8%;text-align:center">Pos.</th>')
             ->toContain('<td>1</td>')
             ->toContain('Batch: PDF-NEU')
             ->toContain('Versandhinweis bleibt erhalten.')
@@ -103,4 +103,68 @@ it('can distinguish repeated product positions when their actual movement quanti
     $numbers = DeliveryNoteBatchNumber::forOffer($offer);
     expect($numbers[$offer->items->first()->id])->toBe('PDF-ALT')
         ->and($numbers[$offer->items->last()->id])->toBe('PDF-NEU');
+});
+
+
+it('shows a read-only provisional FIFO allocation for each active offer status', function (string $status) {
+    [$offer, $product] = batchPdfOffer([5]);
+    $offer->update(['status' => $status]);
+
+    $before = $product->batches()->orderBy('id')->pluck('quantity', 'id')->all();
+    $movementCount = \App\Models\StockMovement::query()->count();
+    $data = DeliveryNoteBatchNumber::forDocument($offer);
+    expect($data)->toBe(['numbers' => [$offer->items->first()->id => 'PDF-NEU'], 'provisional' => true])
+        ->and($product->batches()->orderBy('id')->pluck('quantity', 'id')->all())->toBe($before)
+        ->and(\App\Models\StockMovement::query()->count())->toBe($movementCount);
+
+    $template = new DocumentTemplate(['company_name' => 'PDF Test', 'show_logo' => true]);
+    foreach (['pdf.delivery-note' => 'Batch (voraussichtlich): ', 'pdf.delivery-note-ohne' => 'Batch (provisional): '] as $name => $label) {
+        $html = view($name, [
+            'offer' => $offer,
+            'template' => $template,
+            'logoDataUri' => null,
+            'backgroundDataUri' => null,
+            'batchNumbers' => $data['numbers'],
+            'batchProvisional' => $data['provisional'],
+        ])->render();
+
+        expect($html)->toContain($label.'PDF-NEU')
+            ->not->toContain('PDF-ALT')
+            ->not->toContain('PDF-UNBENUTZT');
+    }
+})->with([Offer::STATUS_OFFER, Offer::STATUS_IN_PROGRESS, Offer::STATUS_READY]);
+
+it('switches from preview to actually booked batches and never substitutes current stock', function () {
+    [$offer, $product] = batchPdfOffer([2]);
+    $itemId = $offer->items->first()->id;
+    expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [$itemId => 'PDF-ALT'], 'provisional' => true]);
+
+    // A different withdrawal consumes the old batch before fulfillment.
+    $product->batches()->where('batch_number', 'PDF-ALT')->update(['quantity' => 0]);
+    app(OfferFulfillmentService::class)->complete($offer);
+    $offer = $offer->fresh('items.product');
+    expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [$itemId => 'PDF-NEU'], 'provisional' => false]);
+
+    \App\Models\StockMovement::query()->where('reference_type', Offer::class)->where('reference_id', $offer->id)->delete();
+    expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [], 'provisional' => false]);
+});
+
+it('allocates repeated product rows in original order independently of PDF sorting', function () {
+    [$offer] = batchPdfOffer([2, 4]);
+    $first = $offer->items->first()->id;
+    $second = $offer->items->last()->id;
+    $offer->setRelation('items', $offer->items->reverse()->values());
+
+    expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [$first => 'PDF-ALT', $second => 'PDF-NEU'], 'provisional' => true]);
+});
+
+it('does not show an incomplete allocation or a preview for a cancelled or expired offer', function () {
+    [$offer, $product] = batchPdfOffer([200]);
+    expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [], 'provisional' => true]);
+    $product->batches()->where('batch_number', 'PDF-UNBENUTZT')->update(['quantity' => 300]);
+
+    foreach ([Offer::STATUS_CANCELLED, Offer::STATUS_RESERVATION_EXPIRED] as $status) {
+        $offer->update(['status' => $status]);
+        expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [], 'provisional' => false]);
+    }
 });
