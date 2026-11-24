@@ -168,3 +168,37 @@ it('does not show an incomplete allocation or a preview for a cancelled or expir
         expect(DeliveryNoteBatchNumber::forDocument($offer))->toBe(['numbers' => [], 'provisional' => false]);
     }
 });
+
+it('renders a narrow position column and a wider product column in DomPDF', function (string $view, string $productLabel) {
+    [$offer] = batchPdfOffer([5]);
+    $data = DeliveryNoteBatchNumber::forDocument($offer);
+    $html = view($view, [
+        'offer' => $offer,
+        'template' => new DocumentTemplate(['company_name' => 'PDF Test', 'show_logo' => true]),
+        'logoDataUri' => null,
+        'backgroundDataUri' => null,
+        'batchNumbers' => $data['numbers'],
+        'batchProvisional' => $data['provisional'],
+    ])->render();
+
+    $widths = [];
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('a4')->getDomPDF();
+    $pdf->setCallbacks([[
+        'event' => 'end_frame',
+        'f' => function ($frame) use (&$widths) {
+            $node = $frame->get_node();
+            if ($node instanceof DOMElement && $node->tagName === 'th') {
+                $box = $frame->get_border_box();
+                $widths[trim($node->textContent)] = (float) ($box['w'] ?? $box[2]);
+            }
+        },
+    ]]);
+    $pdf->render();
+
+    expect($widths)->toHaveKeys(['Pos.', $productLabel])
+        ->and($widths['Pos.'])->toBeGreaterThan(0)
+        ->and($widths['Pos.'])->toBeLessThan($widths[$productLabel] / 3);
+})->with([
+    ['pdf.delivery-note', 'Produkt'],
+    ['pdf.delivery-note-ohne', 'Product'],
+]);
