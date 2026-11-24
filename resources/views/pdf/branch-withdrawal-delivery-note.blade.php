@@ -337,9 +337,9 @@
                 <table class="items">
                     <thead>
                         <tr>
-                            <th>Pos.</th>
-                            <th>Bezeichnung</th>
-                            <th>Menge</th>
+                            <th style="width:8%;text-align:center">Pos.</th>
+                            <th style="width:67%;text-align:left">Bezeichnung</th>
+                            <th style="width:25%;text-align:center">Menge</th>
                         </tr>
                     </thead>
                     <tbody>
