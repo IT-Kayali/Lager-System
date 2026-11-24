@@ -96,7 +96,7 @@ it('uses six columns including position and unit with german labels', function (
         ->toContain('>g<')
         ->toContain('document-unit-table');
 
-    expect($decoded)->toContain('width: 7% !important')->toContain('>Pos.<')->toContain('<td>1</td>');
+    expect($decoded)->toContain('width: 8% !important')->toContain('style="width: 8%; text-align: center;">Pos.</th>')->toContain('<td>1</td>');
 
     expect(strpos($decoded, '>Produkt<'))
         ->toBeLessThan(strpos($decoded, '>Menge<'));
@@ -124,7 +124,7 @@ it('uses six columns including position and unit with english labels without log
         ->toContain('>Stk<')
         ->toContain('document-unit-table');
 
-    expect($decoded)->toContain('width: 7% !important')->toContain('>Pos.<')->toContain('<td>1</td>');
+    expect($decoded)->toContain('width: 8% !important')->toContain('style="width: 8%; text-align: center;">Pos.</th>')->toContain('<td>1</td>');
 
     expect(strpos($decoded, '>PRODUCT<'))
         ->toBeLessThan(strpos($decoded, '>QUANTITY<'));

@@ -35,7 +35,9 @@ class OfferPdfController extends Controller
         ActivityLog::record($activityEvents[$type], $offer, ['offer_number' => $offer->offer_number, 'template' => $template->name]);
         $viewData = compact('offer', 'template', 'title', 'logoDataUri', 'backgroundDataUri') + ['documentType' => $type];
         if ($type === 'delivery-note') {
-            $viewData['batchNumbers'] = DeliveryNoteBatchNumber::forOffer($offer);
+            $batchData = DeliveryNoteBatchNumber::forDocument($offer);
+            $viewData['batchNumbers'] = $batchData['numbers'];
+            $viewData['batchProvisional'] = $batchData['provisional'];
             $html = view($pdfView, $viewData)->render();
             $html = $this->injectCartonCountIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
             $html = $this->injectCustomerDeliveryInstructionIntoDeliveryNote($html, $offer, $isNoLogoPdfTemplate);
@@ -230,6 +232,15 @@ class OfferPdfController extends Controller
             $unitHeader->appendChild($dom->createTextNode($unitLabel));
             $headerNodes[2]->parentNode?->insertBefore($unitHeader, $headerNodes[2]);
 
+            // DomPDF's fixed-layout table uses the first row's widths.
+            // Explicit header widths avoid reliance on positional selectors.
+            $widths = [8, 32, 14, 14, 16, 16];
+            $alignments = ['center', 'left', 'center', 'center', 'right', 'right'];
+            $columns = [$positionHeader, $headerNodes[0], $headerNodes[1], $unitHeader, $headerNodes[2], $headerNodes[3]];
+            foreach ($columns as $index => $column) {
+                $column->setAttribute('style', 'width: '.$widths[$index].'%; text-align: '.$alignments[$index].';');
+            }
+
             $rows = $xpath->query('./tbody/tr', $table);
             if ($rows === false) {
                 continue;
@@ -284,7 +295,7 @@ class OfferPdfController extends Controller
     private function documentPositionColumnCss(bool $withoutLogo): string
     {
         $table = $withoutLogo ? 'table.items.document-unit-table' : '.items-table.document-unit-table';
-        $widths = [7, 29, 16, 14, 17, 17];
+        $widths = [8, 32, 14, 14, 16, 16];
         $alignments = ['center', 'left', 'center', 'center', 'right', 'right'];
         $css = $table . ' th, ' . $table . ' td { overflow-wrap: break-word; word-wrap: break-word; }' . "\n";
 

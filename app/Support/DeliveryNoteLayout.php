@@ -95,7 +95,7 @@ final class DeliveryNoteLayout
         $batch = trim((string) ($item->batch_number ?? ''));
         $batchHeight = 0.0;
         if ($batch !== '') {
-            foreach (preg_split('/\R/u', 'Batch: ' . $batch) ?: [''] as $line) {
+            foreach (preg_split('/\R/u', (string) ($item->batch_label ?? 'Batch: ') . $batch) ?: [''] as $line) {
                 $batchHeight += max(1, (int) ceil(mb_strwidth($line, 'UTF-8') / 28)) * 4.0;
             }
         }

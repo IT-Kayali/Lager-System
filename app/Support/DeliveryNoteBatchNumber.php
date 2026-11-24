@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Offer;
+use App\Models\ProductBatch;
 use App\Models\StockMovement;
 
 final class DeliveryNoteBatchNumber
@@ -56,6 +57,98 @@ final class DeliveryNoteBatchNumber
                 $number = $items->count() === 1
                     ? self::latest($allocations)
                     : self::unambiguousLatest($allocations, self::quantityUnits($item->quantity));
+                if ($number !== null) {
+                    $numbers[$item->id] = $number;
+                }
+            }
+        }
+
+        return $numbers;
+    }
+
+    /**
+     * A preview is deliberately separate from a booked allocation. It is
+     * recalculated from physical stock each time and does not reserve it.
+     *
+     * @return array{numbers: array, provisional: bool}
+     */
+    public static function forDocument(Offer $offer): array
+    {
+        if (! $offer->exists || in_array($offer->status, [Offer::STATUS_CANCELLED, Offer::STATUS_RESERVATION_EXPIRED], true)) {
+            return ['numbers' => [], 'provisional' => false];
+        }
+
+        if ($offer->isCompleted() || $offer->completed_at !== null) {
+            return ['numbers' => self::forOffer($offer), 'provisional' => false];
+        }
+
+        if (! $offer->isReservationActive()) {
+            return ['numbers' => [], 'provisional' => false];
+        }
+
+        // Do not fall back to current stock for incomplete historic movements.
+        if (StockMovement::query()
+            ->where('reference_type', Offer::class)
+            ->where('reference_id', $offer->id)
+            ->where('type', 'out')
+            ->exists()) {
+            return ['numbers' => self::forOffer($offer), 'provisional' => false];
+        }
+
+        return ['numbers' => self::preview($offer), 'provisional' => true];
+    }
+
+    private static function preview(Offer $offer): array
+    {
+        // The fulfillment service consumes stock per original item in FIFO
+        // order (receipt date, then ID). PDF sorting must not change that plan.
+        $items = $offer->items->sortBy('id')->groupBy('product_id');
+        $batches = ProductBatch::query()
+            ->whereIn('product_id', $items->keys()->all())
+            ->orderBy('received_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('product_id');
+
+        $numbers = [];
+        foreach ($items as $productId => $positions) {
+            $stock = $batches->get($productId, collect());
+            $required = $positions->sum(fn ($item) => self::quantityUnits($item->quantity));
+            $available = $stock->sum(fn ($batch) => self::quantityUnits($batch->quantity));
+
+            // A partial stock allocation is not a valid preview for this
+            // product. Leave the batch line empty if it cannot be fulfilled.
+            if ($required <= 0 || $required > $available) {
+                continue;
+            }
+
+            $pool = $stock->filter(fn ($batch) => self::quantityUnits($batch->quantity) > 0)->values();
+            $index = 0;
+            $remainingInBatch = $pool->isEmpty() ? 0 : self::quantityUnits($pool[0]->quantity);
+
+            foreach ($positions as $item) {
+                $remaining = self::quantityUnits($item->quantity);
+                $allocations = [];
+                while ($remaining > 0 && $index < $pool->count()) {
+                    $batch = $pool[$index];
+                    $take = min($remaining, $remainingInBatch);
+                    $allocations[] = [
+                        'batch_id' => $batch->id,
+                        'batch_number' => $batch->batch_number,
+                        'received_at' => $batch->received_at?->toDateString(),
+                        'quantity' => $take / 1000,
+                    ];
+                    $remaining -= $take;
+                    $remainingInBatch -= $take;
+                    if ($remainingInBatch === 0) {
+                        $index++;
+                        $remainingInBatch = $index < $pool->count()
+                            ? self::quantityUnits($pool[$index]->quantity)
+                            : 0;
+                    }
+                }
+
+                $number = $remaining === 0 ? self::latest($allocations) : null;
                 if ($number !== null) {
                     $numbers[$item->id] = $number;
                 }
